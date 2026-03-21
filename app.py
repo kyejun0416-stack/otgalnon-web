@@ -1,40 +1,43 @@
 import streamlit as st
 import google.generativeai as genai
 
-# 1. 기본 설정 (심플한 타이틀)
+# 1. 화면 구성 (심플 & 다크)
 st.set_page_config(page_title="Otgalnon v0.1", layout="centered")
-st.title("Otgalnon v0.1")
-st.caption("Logic Processing Framework")
+st.title("🚀 Otgalnon Control Console")
+st.caption("Nexus-Omni Logic Engine v1.0")
 
-# 2. AI 엔진 연결 (Gemini API 키 입력 필요)
-# 실제 배포 시에는 보안을 위해 암호화 처리가 필요합니다.
-api_key = st.sidebar.text_input("Gemini API Key", type="password")
+# 2. 보안을 위한 사이드바 설정
+with st.sidebar:
+    st.header("⚙️ 엔진 설정")
+    api_key = st.text_input("Gemini API Key를 입력하세요", type="password")
+    # 모델명을 안정적인 버전으로 선택할 수 있게 합니다.
+    target_model = st.selectbox("모델 선택", ["gemini-1.5-flash", "gemini-1.5-pro"])
 
+# 3. 메인 로직 가동
 if api_key:
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(target_model)
 
-    # 3. 사용자 입력창
-    user_input = st.text_area("분석할 지식이나 고민을 입력하십시오:", placeholder="예: 공공 배포 프로그램 구축 전략")
+        user_input = st.text_area("질문이나 고민을 입력하세요:", height=150, placeholder="여기에 입력...")
 
-    if st.button("오트가논 엔진 가동"):
-        if user_input:
-            # 4. 오트가논 핵심 로직 프롬프트 (분해-검증-출력)
-            prompt = f"""
-            당신은 '오트가논' 엔진입니다. 다음 입력에 대해 반드시 3단계 구조로 답변하십시오.
-            
-            [분해]: 문제를 해결하기 위한 3가지 핵심 하위 과제 (키워드 중심).
-            [검증]: 현실적 제약, 논리적 오류, 리스크 2~3가지 비판.
-            [출력]: 최적의 실행 전략을 개조식(Action Item)으로 제안.
-
-            입력 내용: {user_input}
-            """
-            
-            with st.spinner("논리 가공 중..."):
-                response = model.generate_content(prompt)
-                st.markdown("---")
-                st.markdown(response.text)
-        else:
-            st.warning("내용을 입력해 주세요.")
+        if st.button("엔진 가동 (Run)", type="primary"):
+            if not user_input.strip():
+                st.warning("❗ 분석할 내용을 입력해주세요.")
+            else:
+                # 코랩의 rules를 그대로 계승
+                rules = "당신은 Nexus-Omni 요약 엔진입니다. 1.[분해] 2.[검증] 3.[출력] 구조로 핵심만 짧고 명확하게 답변하세요."
+                
+                with st.spinner("🧠 오트가논 논리 엔진 분석 중..."):
+                    response = model.generate_content(f"{rules}\n\n질문: {user_input}")
+                    
+                    st.markdown("---")
+                    st.subheader("💡 분석 결과")
+                    st.markdown(response.text)
+                    st.markdown("---")
+                    
+    except Exception as e:
+        # 에러 발생 시 상세 내용을 화면에 표시
+        st.error(f"❌ 엔진 작동 중 오류가 발생했습니다: {e}")
 else:
-    st.info("왼쪽 사이드바에 Gemini API Key를 입력하면 엔진이 활성화됩니다.")
+    st.info("왼쪽 사이드바( > 모양 클릭)에 API Key를 입력하면 엔진이 활성화됩니다.")

@@ -1,43 +1,78 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
+import base64
+import re
 
-# 1. 화면 구성 (심플 & 다크)
-st.set_page_config(page_title="Otgalnon v0.1", layout="centered")
-st.title("🚀 Otgalnon Control Console")
-st.caption("Nexus-Omni Logic Engine v1.0")
+# 1. 페이지 설정
+st.set_page_config(page_title="otgalnon: Direct Engine", page_icon="⚡", layout="centered")
 
-# 2. 보안을 위한 사이드바 설정
+# 스타일 커스텀 (다크 모드 감성)
+st.markdown("""
+    <style>
+    .stTextArea textarea { background-color: #1e1e1e; color: #ffffff; border-radius: 10px; }
+    .stButton button { width: 100%; border-radius: 20px; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 2. 사이드바 (설정)
 with st.sidebar:
-    st.header("⚙️ 엔진 설정")
-    api_key = st.text_input("Gemini API Key를 입력하세요", type="password")
-    # 모델명을 안정적인 버전으로 선택할 수 있게 합니다.
-    target_model = st.selectbox("모델 선택", ["gemini-1.5-flash", "gemini-1.5-pro"])
+    st.title("⚙️ otgalnon Settings")
+    api_key = st.text_input("Gemini API Key", type="password")
+    model_choice = st.selectbox("Engine", ["gemini-2.0-flash", "gemini-1.5-pro"])
+    st.divider()
+    st.caption("Project: otgalnon v3.5")
+    st.caption("Mode: Direct Strategy")
 
-# 3. 메인 로직 가동
-if api_key:
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(target_model)
+# 3. 메인 인터페이스
+st.title("🧠 오트가논 (otgalnon)")
+st.info("내부적으로 분해와 검증을 거친 '최종 전략'만 즉시 출력합니다.")
 
-        user_input = st.text_area("질문이나 고민을 입력하세요:", height=150, placeholder="여기에 입력...")
+user_input = st.text_area("분석할 과제를 입력하세요", placeholder="내용 입력 또는 이미지 업로드...", height=150)
+uploaded_file = st.file_uploader("이미지 업로드 (선택)", type=["jpg", "jpeg", "png"])
 
-        if st.button("엔진 가동 (Run)", type="primary"):
-            if not user_input.strip():
-                st.warning("❗ 분석할 내용을 입력해주세요.")
-            else:
-                # 코랩의 rules를 그대로 계승
-                rules = "당신은 Nexus-Omni 요약 엔진입니다. 1.[분해] 2.[검증] 3.[출력] 구조로 핵심만 짧고 명확하게 답변하세요."
+# 4. 분석 및 출력 로직
+if st.button("⚡ 오트가논 가동"):
+    if not api_key:
+        st.error("❗ 사이드바에 API 키를 입력해주세요.")
+    elif not user_input and not uploaded_file:
+        st.warning("❗ 입력 내용이 없습니다.")
+    else:
+        with st.spinner("🧠 오트가논이 전략을 추출 중입니다..."):
+            url = f"https://generativelanguage.googleapis.com/v1/models/{model_choice}:generateContent?key={api_key}"
+            
+            # 다이렉트 출력 전용 시스템 규칙
+            system_instruction = """
+            당신은 '오트가논(otgalnon)' 논리 엔진입니다. 
+            내부적으로 [분해], [검증]을 거쳐 최적의 해답을 도출하되, 답변 시에는 오직 최종 결론과 실행 지침만 핵심 위주로 제시하세요.
+            불필요한 인사말, 기호, 마크다운 서식을 최소화하여 전달하세요.
+            """
+            
+            parts = [{"text": f"{system_instruction}\n\n사용자 요청: {user_input}"}]
+            
+            if uploaded_file:
+                image_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
+                parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": image_b64}})
+            
+            payload = {"contents": [{"parts": parts}]}
+            
+            try:
+                response = requests.post(url, json=payload)
+                answer = response.json()['candidates'][0]['content']['parts'][0]['text']
                 
-                with st.spinner("🧠 오트가논 논리 엔진 분석 중..."):
-                    response = model.generate_content(f"{rules}\n\n질문: {user_input}")
-                    
-                    st.markdown("---")
-                    st.subheader("💡 분석 결과")
-                    st.markdown(response.text)
-                    st.markdown("---")
-                    
-    except Exception as e:
-        # 에러 발생 시 상세 내용을 화면에 표시
-        st.error(f"❌ 엔진 작동 중 오류가 발생했습니다: {e}")
-else:
-    st.info("왼쪽 사이드바( > 모양 클릭)에 API Key를 입력하면 엔진이 활성화됩니다.")
+                # 결과 박스
+                st.subheader("🎯 최종 전략")
+                st.write(answer)
+                
+                # 순수 텍스트 복사 기능 (기호 제거)
+                clean_text = re.sub(r'[*#\-`>]', '', answer).strip()
+                
+                # Streamlit의 코드박스는 클릭 시 자동 복사 기능을 지원함
+                st.divider()
+                st.caption("📋 아래 박스를 클릭하면 기호 없는 '순수 내용'이 복사됩니다.")
+                st.code(clean_text, language=None)
+                
+            except Exception as e:
+                st.error(f"❌ 엔진 가동 실패: {e}")
+
+st.divider()
+st.caption("© 2026 Project otgalnon - Direct Strategy Mode")

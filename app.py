@@ -6,7 +6,7 @@ import re
 # 1. 페이지 설정
 st.set_page_config(page_title="otgalnon: Professional", layout="centered")
 
-# CSS 스타일: 이모티콘 없이 선과 색상으로만 구분
+# CSS 스타일
 st.markdown("""
     <style>
     .stTextArea textarea { background-color: #1e1e1e; color: #ffffff; border-radius: 5px; }
@@ -22,13 +22,12 @@ else:
     with st.sidebar:
         st.title("System Settings")
         api_key = st.text_input("Gemini API Key", type="password")
-        st.caption("Settings -> Secrets에 GEMINI_API_KEY를 등록하세요.")
 
 # 사이드바 설정
 with st.sidebar:
     st.divider()
     model_choice = st.selectbox("Engine Selection", ["gemini-flash-latest", "gemini-pro-latest"])
-    st.caption("Project: otgalnon v4.1")
+    st.caption("Project: otgalnon v4.2")
     st.caption("Mode: Direct Strategy (Minimal)")
 
 # 3. 메인 인터페이스
@@ -55,4 +54,33 @@ if st.button("RUN ENGINE"):
                 image_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
                 parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": image_b64}})
             
-            payload = {"contents": [{"parts":
+            # [수정됨] 괄호 구조 정교화
+            payload = {
+                "contents": [
+                    {
+                        "parts": parts
+                    }
+                ]
+            }
+            headers = {'Content-Type': 'application/json'}
+            
+            try:
+                response = requests.post(url, json=payload, headers=headers)
+                res_json = response.json()
+                
+                if 'candidates' in res_json:
+                    answer = res_json['candidates'][0]['content']['parts'][0]['text']
+                    
+                    st.divider()
+                    st.markdown("### Strategic Output")
+                    st.write(answer)
+                    
+                    clean_text = re.sub(r'[*#\-`>]', '', answer).strip()
+                    st.divider()
+                    st.caption("Copy Logic (Plain Text)")
+                    st.code(clean_text, language=None)
+                else:
+                    error_msg = res_json.get('error', {}).get('message', 'Unknown Error')
+                    st.error(f"Error: {error_msg}")
+            except Exception as e:
+                st.error(f"System Error: {e}")

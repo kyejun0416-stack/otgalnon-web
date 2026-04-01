@@ -17,16 +17,16 @@ with st.sidebar:
     st.caption("Project: otgalnon v3.9")
 
 # 3. 메인 인터페이스
-st.title("🧠 오트가논 (otgalnon)")
+st.title(" 오트가논 (otgalnon)")
 
 user_input = st.text_area("분석할 과제를 입력하세요", placeholder="내용 입력...", height=150)
 uploaded_file = st.file_uploader("이미지 업로드 (선택)", type=["jpg", "jpeg", "png"])
 
-if st.button("⚡ 오트가논 가동"):
+if st.button(" 오트가논 가동"):
     if not api_key:
-        st.error("❗ 사이드바에 API 키를 입력해주세요.")
+        st.error(" 사이드바에 API 키를 입력해주세요.")
     else:
-        with st.spinner("🧠 전략 추출 중..."):
+        with st.spinner(" 전략 추출 중..."):
             # [핵심 수정] curl 명령어와 100% 일치하는 엔드포인트 구성
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_choice}:generateContent?key={api_key}"
             
@@ -46,7 +46,7 @@ if st.button("⚡ 오트가논 가동"):
                 
                 if 'candidates' in res_json:
                     answer = res_json['candidates'][0]['content']['parts'][0]['text']
-                    st.subheader("🎯 최종 전략")
+                    st.subheader(" 최종 전략")
                     st.write(answer)
                     
                     # 복사용 텍스트 정제 (기호 제거)
@@ -56,9 +56,9 @@ if st.button("⚡ 오트가논 가동"):
                     st.code(clean_text, language=None)
                 else:
                     error_msg = res_json.get('error', {}).get('message', 'API 응답 오류')
-                    st.error(f"❌ 엔진 가동 실패: {error_msg}")
+                    st.error(f" 엔진 가동 실패: {error_msg}")
                     with st.expander("상세 로그 확인"):
                         st.json(res_json)
                         
             except Exception as e:
-                st.error(f"❌ 시스템 오류: {e}")
+                st.error(f" 시스템 오류: {e}")

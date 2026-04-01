@@ -4,28 +4,55 @@ import base64
 import re
 import os
 
-# 1. 페이지 설정
+# 1. 페이지 설정 및 브라우저 탭 아이콘
 st.set_page_config(
     page_title="otgalnon",
     page_icon="logo.png",
     layout="centered"
 )
 
-# CSS 스타일
+# 2. 보라색 테마 기반 CSS 커스텀
 st.markdown("""
     <style>
-    .stTextArea textarea { background-color: #1e1e1e; color: #ffffff; border-radius: 5px; border: 1px solid #333; }
-    .stButton button { 
-        width: 100%; border-radius: 5px; font-weight: bold; 
-        background-color: #262626; color: #efefef; border: 1px solid #444;
+    /* 전체 배경 및 텍스트 영역 */
+    .stApp { background-color: #0e1117; }
+    .stTextArea textarea { 
+        background-color: #1e1e2e; 
+        color: #d1d1e0; 
+        border-radius: 8px; 
+        border: 1px solid #4b0082; /* 인디고 퍼플 경계선 */
     }
-    .stButton button:hover { border-color: #ffffff; color: #ffffff; background-color: #333; }
-    [data-testid="stImage"] { margin-bottom: -30px; }
-    code { color: #ff4b4b !important; }
+    
+    /* 버튼 스타일: 보라색 포인트 */
+    .stButton button { 
+        width: 100%; 
+        border-radius: 8px; 
+        font-weight: bold; 
+        background-color: #4b0082; 
+        color: white; 
+        border: none;
+        transition: all 0.3s;
+    }
+    .stButton button:hover { 
+        background-color: #6a0dad; 
+        box-shadow: 0 0 15px #6a0dad;
+    }
+    
+    /* 코드 박스 스타일: 보라색 텍스트 강조 */
+    code { 
+        color: #bf94ff !important; 
+        background-color: #16161d !important;
+    }
+    
+    /* 로고 이미지 위치 조정 */
+    [data-testid="stImage"] { margin-bottom: -35px; }
+    
+    /* 구분선 컬러 */
+    hr { border-top: 1px solid #3d3d5c; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. 헤더 섹션
+# 3. 헤더 섹션 (로고 & 타이틀)
 col1, col2 = st.columns([1, 5])
 with col1:
     if os.path.exists("logo.png"):
@@ -35,72 +62,13 @@ with col1:
 
 with col2:
     st.title("otgalnon")
-    st.caption("Strategic Insight & Logic Engine")
+    st.markdown("<p style='color:#8a8ab5; margin-top:-15px;'>Strategic Insight & Logic Engine</p>", unsafe_allow_html=True)
 
 st.divider()
 
-# 3. API 키 로드
+# 4. API 키 보안 로드 (Secrets 우선)
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
     with st.sidebar:
         st.title("System Settings")
-        api_key = st.text_input("Gemini API Key", type="password")
-
-with st.sidebar:
-    st.divider()
-    model_choice = st.selectbox("Engine Selection", ["gemini-flash-latest", "gemini-pro-latest"])
-    st.caption("Project: otgalnon v4.6")
-    st.caption("Architecture: Minimal Vector Logic")
-
-# 4. 입력 인터페이스
-user_input = st.text_area("분석 과제 입력", placeholder="내용을 입력하거나 이미지를 업로드하십시오.", height=180)
-uploaded_file = st.file_uploader("데이터 업로드 (이미지)", type=["jpg", "jpeg", "png"])
-
-# 5. 가동 로직 (들여쓰기 정밀 교정)
-if st.button("RUN STRATEGY ENGINE"):
-    if not api_key:
-        st.error("시스템 가동 실패: API Key가 유효하지 않습니다.")
-    elif not user_input and not uploaded_file:
-        st.warning("분석 데이터 미검출: 내용을 입력하십시오.")
-    else:
-        with st.spinner("Processing Logic..."):
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_choice}:generateContent?key={api_key}"
-            
-            system_instruction = (
-                "당신은 '오트가논' 전략 엔진입니다. 이모티콘 사용을 금지합니다. "
-                "수학적 증명처럼 간결하고 논리적인 문체를 유지하며 핵심 결론만 출력하십시오."
-            )
-            
-            parts = [{"text": f"{system_instruction}\n\nTask: {user_input}"}]
-            
-            if uploaded_file:
-                image_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
-                parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": image_b64}})
-            
-            payload = {
-                "contents": [{"parts": parts}]
-            }
-            headers = {'Content-Type': 'application/json'}
-            
-            try:
-                response = requests.post(url, json=payload, headers=headers, timeout=30)
-                res_json = response.json()
-                
-                if 'candidates' in res_json:
-                    answer = res_json['candidates'][0]['content']['parts'][0]['text']
-                    st.markdown("### Strategic Output")
-                    st.write(answer)
-                    
-                    clean_text = re.sub(r'[*#\-`>]', '', answer).strip()
-                    st.divider()
-                    st.caption("Plain Text for Copy")
-                    st.code(clean_text, language=None)
-                else:
-                    error_msg = res_json.get('error', {}).get('message', 'API Error')
-                    st.error(f"Engine Error: {error_msg}")
-            except Exception as e:
-                st.error(f"System Failure: {e}")
-
-st.divider()
-st.caption("© 2026 otgalnon Architecture. All rights reserved.")

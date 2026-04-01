@@ -38,38 +38,34 @@ with col2:
 st.divider()
 
 # 4. 입력 인터페이스
-user_input = st.text_area("분석 과제 입력", placeholder="전략적 분석이 필요한 내용을 입력하십시오.", height=200)
+user_input = st.text_area("분석 과제 입력", placeholder="분석이 필요한 내용을 입력하십시오.", height=200)
 uploaded_file = st.file_uploader("이미지 데이터 업로드", type=["jpg", "jpeg", "png"])
 
-# 5. API 설정 (Secrets 자동 로드)
-# 사용자가 수정할 필요가 없으므로 사이드바를 깔끔하게 정리합니다.
+# 5. API 설정
 api_key = st.secrets.get("GEMINI_API_KEY")
 model_name = "gemini-flash-latest"
 
-with st.sidebar:
-    st.title("System Status")
-    if api_key:
-        st.success("API Engine: Online")
-    else:
-        st.error(" API Key Missing in Secrets")
-    st.divider()
-    st.caption(f"Model: {model_name}")
-    st.caption("v6.0 | Full-Auto Mode")
-
-# 6. 엔진 가동 로직
+# 6. 엔진 가동 로직 (가독성 강화 버전)
 if st.button("RUN STRATEGY ENGINE"):
     if not api_key:
-        st.error("시스템 오류: Streamlit Secrets에 GEMINI_API_KEY가 설정되지 않았습니다.")
+        st.error("시스템 오류: API Key가 없습니다.")
     elif not user_input and not uploaded_file:
-        st.warning("분석할 데이터를 입력하십시오.")
+        st.warning("데이터를 입력하십시오.")
     else:
-        with st.spinner("Processing Strategy..."):
+        with st.spinner("Decoding Strategy..."):
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-                instr = "당신은 '오트가논' 엔진입니다. 이모티콘 없이 수학적으로 간결하게 답변하세요."
                 
-                parts = [{"text": f"{instr}\n\nTask: {user_input}"}]
+                # [수정 포인트] 대답을 쉽고 명확하게 만들도록 지침 변경
+                system_instruction = (
+                    "당신은 '오트가논' 엔진입니다. "
+                    "1. 복잡한 전문 용어나 어려운 과학 수식 대신, 직관적이고 쉬운 단어를 사용하세요. "
+                    "2. 논리적인 단계(Step)로 나누어 설명하되, 초등학생도 이해할 수 있을 만큼 명확해야 합니다. "
+                    "3. 이모티콘은 절대 사용하지 말고, 군더더기 없는 깔끔한 문체로 핵심만 전달하세요. "
+                    "4. 답변은 [개요], [실행 단계], [최종 결론]의 구조로 고정합니다."
+                )
                 
+                parts = [{"text": f"{system_instruction}\n\nTask: {user_input}"}]
                 if uploaded_file:
                     img_data = base64.b64encode(uploaded_file.read()).decode('utf-8')
                     parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": img_data}})
@@ -80,15 +76,16 @@ if st.button("RUN STRATEGY ENGINE"):
                 if 'candidates' in res_json:
                     answer = res_json['candidates'][0]['content']['parts'][0]['text']
                     st.markdown("### Strategic Output")
+                    # 결과 출력
                     st.write(answer)
                     st.divider()
-                    st.markdown("<p style='color:#bf94ff; font-size:0.8rem;'>Plain Text for Copy</p>", unsafe_allow_html=True)
-                    st.code(re.sub(r'[*#\-`>]', '', answer).strip(), language=None)
+                    # 복사용 텍스트 (불필요한 특수문자 제거)
+                    clean_text = re.sub(r'[*#\-`>]', '', answer).strip()
+                    st.code(clean_text, language=None)
                 else:
-                    err = res_json.get('error', {}).get('message', 'Unknown Error')
-                    st.error(f"Engine Error: {err}")
+                    st.error("Engine Error: API 응답을 확인하십시오.")
             except Exception as e:
                 st.error(f"System Failure: {e}")
 
 st.divider()
-st.caption("© 2026 otgalnon Architecture. Automated via Streamlit Secrets.")
+st.caption("© 2026 otgalnon Architecture. Optimized for Clarity.")

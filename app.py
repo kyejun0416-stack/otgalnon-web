@@ -2,59 +2,100 @@ import streamlit as st
 import requests
 import base64
 import re
+import os
 
-# 1. 페이지 설정
-st.set_page_config(page_title="otgalnon: Professional", layout="centered")
+# 1. 페이지 설정 및 브라우저 탭 아이콘(Favicon) 적용
+st.set_page_config(
+    page_title="otgalnon",
+    page_icon="logo.png",
+    layout="centered"
+)
 
-# CSS 스타일
+# CSS 스타일: 미니멀리즘 및 전문적인 다크 톤 유지
 st.markdown("""
     <style>
-    .stTextArea textarea { background-color: #1e1e1e; color: #ffffff; border-radius: 5px; }
-    .stButton button { width: 100%; border-radius: 5px; font-weight: bold; background-color: #333; color: white; border: 1px solid #555; }
-    .stButton button:hover { border-color: #ff4b4b; color: #ff4b4b; }
+    /* 메인 배경 및 텍스트 영역 스타일 */
+    .stTextArea textarea { background-color: #1e1e1e; color: #ffffff; border-radius: 5px; border: 1px solid #333; }
+    
+    /* 버튼 스타일: 수학적 간결함 강조 */
+    .stButton button { 
+        width: 100%; 
+        border-radius: 5px; 
+        font-weight: bold; 
+        background-color: #262626; 
+        color: #efefef; 
+        border: 1px solid #444;
+        transition: all 0.3s;
+    }
+    .stButton button:hover { border-color: #ffffff; color: #ffffff; background-color: #333; }
+    
+    /* 로고 및 타이틀 간격 조절 */
+    [data-testid="stImage"] { margin-bottom: -30px; }
+    
+    /* 코드 박스(복사 영역) 스타일 */
+    code { color: #ff4b4b !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. API 키 로드 로직
+# 2. 로고 및 헤더 섹션
+col1, col2 = st.columns([1, 5])
+with col1:
+    if os.path.exists("logo.png"):
+        st.image("logo.png", width=80)
+    else:
+        st.caption("No Logo")
+
+with col2:
+    st.title("otgalnon")
+    st.caption("Strategic Insight & Logic Engine")
+
+st.divider()
+
+# 3. API 키 보안 로드 (Secrets 우선, 없을 시 사이드바)
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
     with st.sidebar:
         st.title("System Settings")
         api_key = st.text_input("Gemini API Key", type="password")
+        st.info("💡 Permanent access: Add GEMINI_API_KEY to Streamlit Secrets.")
 
-# 사이드바 설정
+# 사이드바 설정 영역
 with st.sidebar:
     st.divider()
     model_choice = st.selectbox("Engine Selection", ["gemini-flash-latest", "gemini-pro-latest"])
-    st.caption("Project: otgalnon v4.2")
-    st.caption("Mode: Direct Strategy (Minimal)")
+    st.caption("Project: otgalnon v4.5")
+    st.caption("Architecture: Minimal Vector Logic")
 
-# 3. 메인 인터페이스
-st.title("otgalnon")
-st.caption("분해와 검증을 거친 최종 전략 엔진")
-st.divider()
+# 4. 메인 입력 인터페이스
+user_input = st.text_area("분석 과제 입력", placeholder="분석할 내용을 입력하거나 이미지를 업로드하십시오.", height=180)
+uploaded_file = st.file_uploader("데이터 업로드 (이미지)", type=["jpg", "jpeg", "png"])
 
-user_input = st.text_area("분석 과제 입력", placeholder="텍스트를 입력하거나 파일을 업로드하십시오.", height=150)
-uploaded_file = st.file_uploader("이미지 업로드", type=["jpg", "jpeg", "png"])
-
-if st.button("RUN ENGINE"):
+# 5. 엔진 가동 로직
+if st.button("RUN STRATEGY ENGINE"):
     if not api_key:
-        st.error("API Key가 누락되었습니다.")
+        st.error("시스템 가동 실패: API Key가 유효하지 않습니다.")
     elif not user_input and not uploaded_file:
-        st.warning("분석할 데이터가 없습니다.")
+        st.warning("분석 데이터 미검출: 내용을 입력하십시오.")
     else:
-        with st.spinner("Processing..."):
+        with st.spinner("Processing Logic..."):
+            # 정밀 타격 엔드포인트 구성
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_choice}:generateContent?key={api_key}"
             
-            system_instruction = "당신은 '오트가논' 엔진입니다. 내부적으로 분해/검증 후 최종 [출력] 내용만 핵심 위주로 제시하세요. 이모티콘 사용을 금지하고 건조하고 명확한 문체를 유지하십시오."
+            # 수학적 간결함을 유지하기 위한 시스템 프롬프트
+            system_instruction = (
+                "당신은 '오트가논(otgalnon)' 전략 엔진입니다. "
+                "모든 답변에서 이모티콘 사용을 엄격히 금지합니다. "
+                "수학적 증명처럼 간결하고 논리적인 문체를 유지하며, "
+                "불필요한 수식어를 배제하고 핵심 실행 지침과 전략적 결론만 출력하십시오."
+            )
             
-            parts = [{"text": f"{system_instruction}\n\n사용자 요청: {user_input}"}]
+            parts = [{"text": f"{system_instruction}\n\nTask: {user_input}"}]
+            
             if uploaded_file:
                 image_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
                 parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": image_b64}})
             
-            # [수정됨] 괄호 구조 정교화
             payload = {
                 "contents": [
                     {
@@ -65,22 +106,15 @@ if st.button("RUN ENGINE"):
             headers = {'Content-Type': 'application/json'}
             
             try:
-                response = requests.post(url, json=payload, headers=headers)
+                response = requests.post(url, json=payload, headers=headers, timeout=30)
                 res_json = response.json()
                 
                 if 'candidates' in res_json:
                     answer = res_json['candidates'][0]['content']['parts'][0]['text']
                     
-                    st.divider()
+                    # 출력 결과 표시
                     st.markdown("### Strategic Output")
                     st.write(answer)
                     
-                    clean_text = re.sub(r'[*#\-`>]', '', answer).strip()
-                    st.divider()
-                    st.caption("Copy Logic (Plain Text)")
-                    st.code(clean_text, language=None)
-                else:
-                    error_msg = res_json.get('error', {}).get('message', 'Unknown Error')
-                    st.error(f"Error: {error_msg}")
-            except Exception as e:
-                st.error(f"System Error: {e}")
+                    # 텍스트 복사 최적화 (기호 제거 로직)
+                    clean_

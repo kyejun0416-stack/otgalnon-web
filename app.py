@@ -16,7 +16,7 @@ with st.sidebar:
     st.caption("Project: otgalnon v3.6")
 
 # 3. 메인 인터페이스
-st.title("🧠 오트가논 (otgalnon)")
+st.title(" 오트가논 (otgalnon)")
 
 user_input = st.text_area("분석할 과제를 입력하세요", placeholder="내용 입력...", height=150)
 uploaded_file = st.file_uploader("이미지 업로드 (선택)", type=["jpg", "jpeg", "png"])
@@ -25,7 +25,7 @@ if st.button("⚡ 오트가논 가동"):
     if not api_key:
         st.error("❗ 사이드바에 API 키를 입력해주세요.")
     else:
-        with st.spinner("🧠 전략 추출 중..."):
+        with st.spinner(" 전략 추출 중..."):
             # API URL 구성 (v1beta 사용 권장)
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_choice}:generateContent?key={api_key}"
             

@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 import re
-import os
+import os 
 
 # 1. 페이지 설정
 st.set_page_config(page_title="otgalnon", page_icon="logo.png", layout="centered")
@@ -60,35 +60,70 @@ with st.sidebar:
     model_choice = st.selectbox("Engine Selection", ["gemini-flash-latest", "gemini-pro-latest"])
     st.caption("v5.2 | Strategic Purple")
 
-# 6. 엔진 가동 로직
+
+# 6. 엔진 가동 로직 (타임아웃 보강 버전)
 if st.button("RUN STRATEGY ENGINE"):
     if not api_key:
-        st.error("오류: 사이드바(왼쪽 화살표 > 클릭)에 API Key를 입력하십시오.")
+        st.error("오류: 사이드바에 API Key를 입력하십시오.")
     elif not user_input and not uploaded_file:
-        st.warning("내용을 입력하십시오.")
+        st.warning("분석 데이터가 없습니다.")
     else:
-        with st.spinner("Decoding Logic..."):
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_choice}:generateContent?key={api_key}"
-            system_instruction = "당신은 '오트가논' 전략 엔진입니다. 이모티콘 없이 수학적이고 간결한 문체로 핵심만 답변하세요."
-            
-            parts = [{"text": f"{system_instruction}\n\nTask: {user_input}"}]
-            if uploaded_file:
-                image_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
-                parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": image_b64}})
-            
+        # 진행 상태 표시
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        with st.spinner("Decoding Strategy..."):
             try:
-                response = requests.post(url, json={"contents": [{"parts": parts}]}, timeout=30)
+                # API 엔드포인트
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_choice}:generateContent?key={api_key}"
+                
+                # 시스템 지침 강화
+                system_instruction = "당신은 '오트가논' 전략 엔진입니다. 이모티콘 없이 수학적이고 간결한 문체로 핵심만 답변하세요."
+                
+                status_text.text("데이터 패키징 중...")
+                progress_bar.progress(30)
+                
+                parts = [{"text": f"{system_instruction}\n\nTask: {user_input}"}]
+                
+                if uploaded_file:
+                    # 이미지 인코딩
+                    image_b64 = base64.b64encode(uploaded_file.getvalue()).decode('utf-8')
+                    parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": image_b64}})
+                
+                status_text.text("구글 서버 통신 중 (최대 60초 대기)...")
+                progress_bar.progress(60)
+                
+                # [핵심 수정] 타격 대기 시간을 60초로 확장하고 JSON 구조 정밀화
+                response = requests.post(
+                    url, 
+                    json={"contents": [{"parts": parts}]}, 
+                    headers={'Content-Type': 'application/json'},
+                    timeout=60 # 대기 시간을 60초로 상향
+                )
+                
                 res_json = response.json()
+                progress_bar.progress(90)
+                
                 if 'candidates' in res_json:
+                    status_text.text("전략 추출 완료.")
                     answer = res_json['candidates'][0]['content']['parts'][0]['text']
+                    
                     st.markdown("### Strategic Output")
                     st.write(answer)
+                    
+                    # 텍스트 복사 최적화
+                    clean_text = re.sub(r'[*#\-`>]', '', answer).strip()
                     st.divider()
-                    st.code(re.sub(r'[*#\-`>]', '', answer).strip(), language=None)
+                    st.markdown("<p style='color:#bf94ff; font-size:0.8rem;'>Plain Text for Copy</p>", unsafe_allow_html=True)
+                    st.code(clean_text, language=None)
                 else:
-                    st.error(f"Engine Error: {res_json.get('error', {}).get('message', 'API Error')}")
-            except Exception as e:
-                st.error(f"System Failure: {e}")
+                    error_details = res_json.get('error', {}).get('message', '알 수 없는 API 응답')
+                    st.error(f"Engine Error: {error_details}")
+                
+                progress_bar.progress(100)
+                status_text.empty()
 
-st.divider()
-st.caption("© 2026 otgalnon Architecture.")
+            except requests.exceptions.Timeout:
+                st.error(" 서버 응답 시간 초과 (Timeout): 구글 서버가 너무 바쁘거나 데이터가 너무 큽니다. 잠시 후 다시 시도하세요.")
+            except Exception as e:
+                st.error(f" 가동 실패: {e}")

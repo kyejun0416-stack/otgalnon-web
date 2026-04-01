@@ -105,16 +105,32 @@ if st.button("RUN STRATEGY ENGINE"):
             }
             headers = {'Content-Type': 'application/json'}
             
-            try:
+           try:
+                # 1. API 호출
                 response = requests.post(url, json=payload, headers=headers, timeout=30)
                 res_json = response.json()
                 
+                # 2. 응답 성공 여부 확인
                 if 'candidates' in res_json:
                     answer = res_json['candidates'][0]['content']['parts'][0]['text']
                     
-                    # 출력 결과 표시
                     st.markdown("### Strategic Output")
                     st.write(answer)
                     
-                    # 텍스트 복사 최적화 (기호 제거 로직)
-                    clean_
+                    # [에러 지점] 텍스트 정제 및 복사 영역
+                    clean_text = re.sub(r'[*#\-`>]', '', answer).strip()
+                    st.divider()
+                    st.caption("Plain Text for Copy")
+                    st.code(clean_text, language=None)
+                else:
+                    # API는 응답했으나 에러 내용이 있는 경우
+                    error_msg = res_json.get('error', {}).get('message', 'Unknown API Error')
+                    st.error(f"Engine Error: {error_msg}")
+                    
+            except Exception as e:
+                # 네트워크 오류 등 시스템 예외 처리 (SyntaxError 해결의 핵심)
+                st.error(f"System Failure: {e}")
+
+# 최하단 푸터
+st.divider()
+st.caption("© 2026 otgalnon Architecture. All rights reserved.")

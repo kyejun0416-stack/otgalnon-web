@@ -98,3 +98,38 @@ if st.button("RUN STRATEGY ENGINE"):
                     
                     st.markdown("### Strategic Output")
                     st
+                response = requests.post(url, json={"contents": contents}, timeout=60)
+                res_json = response.json()
+                
+                if 'candidates' in res_json:
+                    answer = res_json['candidates'][0]['content']['parts'][0]['text']
+                    
+                    # 세션 상태에 대화 내용 저장
+                    st.session_state.chat_history.append({"role": "user", "text": user_input})
+                    st.session_state.chat_history.append({"role": "model", "text": answer})
+                    
+                    st.markdown("### Strategic Output")
+                    st.write(answer)
+                    
+                    st.divider()
+                    st.markdown("<p style='color:#bf94ff; font-size:0.8rem;'>Plain Text for Copy</p>", unsafe_allow_html=True)
+                    # 특수문자 제거 후 코드박스 출력
+                    clean_text = re.sub(r'[*#\-`>]', '', answer).strip()
+                    st.code(clean_text, language=None)
+                else:
+                    err_msg = res_json.get('error', {}).get('message', 'Unknown response')
+                    st.error(f"Engine Error: {err_msg}")
+                    
+            except Exception as e:
+                # [에러 해결 핵심] try 문을 닫아주는 except 블록
+                st.error(f"System Failure: {e}")
+
+# 최근 대화 기록 표시 (선택 사항)
+if st.session_state.chat_history:
+    with st.expander("View Recent Chat History"):
+        for chat in st.session_state.chat_history[-4:]:
+            role_label = "👤 User" if chat["role"] == "user" else "🟣 Engine"
+            st.markdown(f"**{role_label}**: {chat['text'][:100]}...")
+
+st.divider()
+st.caption("© 2026 otgalnon Architecture. Context-Aware Enabled.")

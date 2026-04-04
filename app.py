@@ -11,81 +11,90 @@ st.set_page_config(page_title="otgalnon", page_icon="logo.png", layout="centered
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
-    .stTextArea textarea { 
-        background-color: #1e1e2e !important; 
-        color: #ffffff !important; 
-        border: 1px solid #4b0082 !important; 
-    }
-    .stButton button { 
-        width: 100%; border-radius: 8px; font-weight: bold; 
-        background-color: #4b0082; color: white; border: none; height: 3.5em;
-    }
+    .stTextArea textarea { background-color: #1e1e2e !important; color: #ffffff !important; border: 1px solid #4b0082 !important; }
+    .stButton button { width: 100%; border-radius: 8px; font-weight: bold; background-color: #4b0082; color: white; border: none; height: 3.5em; }
     .stButton button:hover { background-color: #6a0dad; box-shadow: 0 0 20px #6a0dad; }
     code { color: #bf94ff !important; background-color: #16161d !important; }
     [data-testid="stImage"] { margin-bottom: -35px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 헤더 섹션
+# 3. 세션 상태(대화 기록) 초기화
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+# 4. 헤더 섹션
 col1, col2 = st.columns([1, 5])
 with col1:
     if os.path.exists("logo.png"): st.image("logo.png", width=80)
     else: st.write("🟣")
 with col2:
     st.title("otgalnon")
-    st.caption("Strategic Insight & Logic Engine")
+    st.caption("Strategic Insight & Memory Engine")
 
 st.divider()
 
-# 4. 입력 인터페이스
-user_input = st.text_area("분석 과제 입력", placeholder="분석이 필요한 내용을 입력하십시오.", height=200)
+# 5. 입력 인터페이스
+user_input = st.text_area("분석 과제 입력", placeholder="이전 대화 내용을 기억합니다. 이어서 질문해 보세요.", height=150)
 uploaded_file = st.file_uploader("이미지 데이터 업로드", type=["jpg", "jpeg", "png"])
 
-# 5. API 설정
+# 6. API 및 모델 설정
 api_key = st.secrets.get("GEMINI_API_KEY")
 model_name = "gemini-flash-latest"
 
-# 6. 엔진 가동 로직 (가독성 강화 버전)
+# 사이드바: 대화 초기화 버튼 추가
+with st.sidebar:
+    st.title("Memory Control")
+    if st.button("Clear Chat History"):
+        st.session_state.chat_history = []
+        st.success("대화 기록이 초기화되었습니다.")
+    st.divider()
+    st.caption(f"Model: {model_name}")
+    st.caption("v7.0 | Long-term Memory Mode")
+
+# 7. 엔진 가동 로직
 if st.button("RUN STRATEGY ENGINE"):
     if not api_key:
         st.error("시스템 오류: API Key가 없습니다.")
     elif not user_input and not uploaded_file:
         st.warning("데이터를 입력하십시오.")
     else:
-        with st.spinner("Decoding Strategy..."):
+        with st.spinner("Accessing Memory & Logic..."):
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
                 
-                # [수정 포인트] 대답을 쉽고 명확하게 만들도록 지침 변경
                 system_instruction = (
                     "당신은 '오트가논' 엔진입니다. "
-                    "1. 복잡한 전문 용어나 어려운 과학 수식 대신, 직관적이고 쉬운 단어를 사용하세요. "
-                    "2. 논리적인 단계(Step)로 나누어 설명하되, 초등학생도 이해할 수 있을 만큼 명확해야 합니다. "
-                    "3. 이모티콘은 절대 사용하지 말고, 군더더기 없는 깔끔한 문체로 핵심만 전달하세요. "
-                    "4. 답변은 [개요], [실행 단계], [최종 결론]의 구조로 고정합니다."
+                    "쉬운 단어를 사용해 논리적으로 설명하며, 이모티콘은 사용하지 마세요. "
+                    "이전 대화 맥락이 주어지면 이를 참고하여 답변하십시오."
                 )
                 
-                parts = [{"text": f"{system_instruction}\n\nTask: {user_input}"}]
+                # [핵심] 대화 기록 구조화 (Gemini API 형식)
+                contents = []
+                
+                # 1. 과거 기록 추가
+                for chat in st.session_state.chat_history:
+                    contents.append({"role": chat["role"], "parts": [{"text": chat["text"]}]})
+                
+                # 2. 현재 사용자 입력 추가 (시스템 지침 포함)
+                current_parts = [{"text": f"{system_instruction}\n\nTask: {user_input}"}]
+                
                 if uploaded_file:
                     img_data = base64.b64encode(uploaded_file.read()).decode('utf-8')
-                    parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": img_data}})
+                    current_parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": img_data}})
                 
-                response = requests.post(url, json={"contents": [{"parts": parts}]}, timeout=60)
+                contents.append({"role": "user", "parts": current_parts})
+                
+                # API 호출
+                response = requests.post(url, json={"contents": contents}, timeout=60)
                 res_json = response.json()
                 
                 if 'candidates' in res_json:
                     answer = res_json['candidates'][0]['content']['parts'][0]['text']
+                    
+                    # [핵심] 세션 상태에 대화 내용 저장
+                    st.session_state.chat_history.append({"role": "user", "text": user_input})
+                    st.session_state.chat_history.append({"role": "model", "text": answer})
+                    
                     st.markdown("### Strategic Output")
-                    # 결과 출력
-                    st.write(answer)
-                    st.divider()
-                    # 복사용 텍스트 (불필요한 특수문자 제거)
-                    clean_text = re.sub(r'[*#\-`>]', '', answer).strip()
-                    st.code(clean_text, language=None)
-                else:
-                    st.error("Engine Error: API 응답을 확인하십시오.")
-            except Exception as e:
-                st.error(f"System Failure: {e}")
-
-st.divider()
-st.caption("© 2026 otgalnon Architecture. Optimized for Clarity.")
+                    st

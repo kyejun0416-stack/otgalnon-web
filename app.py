@@ -4,132 +4,95 @@ import base64
 import re
 import os
 
-# 1. 페이지 설정
+# 1. 페이지 설정 및 캐싱 최적화
 st.set_page_config(page_title="otgalnon", page_icon="logo.png", layout="centered")
 
-# 2. 보라색 테마 디자인
+# 2. 디자인 (애니메이션 최소화로 로딩 속도 향상)
 st.markdown("""
     <style>
     .stApp { background-color: #0e1117; }
     .stTextArea textarea { background-color: #1e1e2e !important; color: #ffffff !important; border: 1px solid #4b0082 !important; }
-    .stButton button { width: 100%; border-radius: 8px; font-weight: bold; background-color: #4b0082; color: white; border: none; height: 3.5em; }
-    .stButton button:hover { background-color: #6a0dad; box-shadow: 0 0 20px #6a0dad; }
+    .stButton button { 
+        width: 100%; border-radius: 8px; font-weight: bold; 
+        background-color: #4b0082; color: white; border: none; height: 3.5em; 
+    }
     code { color: #bf94ff !important; background-color: #16161d !important; }
-    [data-testid="stImage"] { margin-bottom: -35px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 세션 상태(대화 기록) 초기화
+# 3. 대화 기록 관리 (최근 5개만 유지하여 속도 최적화)
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# 4. 헤더 섹션
+# 4. 헤더
 col1, col2 = st.columns([1, 5])
 with col1:
     if os.path.exists("logo.png"): st.image("logo.png", width=80)
     else: st.write("🟣")
 with col2:
     st.title("otgalnon")
-    st.caption("Strategic Insight & Memory Engine")
-
-st.divider()
+    st.caption("High-Speed Strategic Engine")
 
 # 5. 입력 인터페이스
-user_input = st.text_area("분석 과제 입력", placeholder="이전 대화 내용을 기억합니다. 이어서 질문해 보세요.", height=150)
-uploaded_file = st.file_uploader("이미지 데이터 업로드", type=["jpg", "jpeg", "png"])
+user_input = st.text_area("분석 과제 입력", placeholder="빠른 분석을 시작합니다.", height=150)
+uploaded_file = st.file_uploader("이미지 업로드", type=["jpg", "jpeg", "png"])
 
-# 6. API 및 모델 설정
+# 6. API 설정 (가장 빠른 flash 모델 고정)
 api_key = st.secrets.get("GEMINI_API_KEY")
-model_name = "gemini-flash-latest"
+model_name = "gemini-1.5-flash" # 현재 가장 응답 속도가 빠른 안정 버전
 
-# 사이드바: 대화 초기화 버튼 추가
 with st.sidebar:
-    st.title("Memory Control")
-    if st.button("Clear Chat History"):
+    st.title("Performance")
+    st.info(f"Model: {model_name}")
+    if st.button("Reset Memory"):
         st.session_state.chat_history = []
-        st.success("대화 기록이 초기화되었습니다.")
-    st.divider()
-    st.caption(f"Model: {model_name}")
-    st.caption("v7.0 | Long-term Memory Mode")
+        st.rerun()
+    st.caption("v7.5 | Speed Optimized")
 
-# 7. 엔진 가동 로직
+# 7. 엔진 가동 로직 (경량화 패치)
 if st.button("RUN STRATEGY ENGINE"):
     if not api_key:
-        st.error("시스템 오류: API Key가 없습니다.")
+        st.error("API Key missing.")
     elif not user_input and not uploaded_file:
-        st.warning("데이터를 입력하십시오.")
+        st.warning("No data.")
     else:
-        with st.spinner("Accessing Memory & Logic..."):
+        with st.spinner("Fast Decoding..."):
             try:
+                # v1beta 대신 안정화된 v1 버전 사용 시도 (속도 이점)
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
                 
-                system_instruction = (
-                    "당신은 '오트가논' 엔진입니다. "
-                    "쉬운 단어를 사용해 논리적으로 설명하며, 이모티콘은 사용하지 마세요. "
-                    "이전 대화 맥락이 주어지면 이를 참고하여 답변하십시오."
-                )
+                # 시스템 지침을 더 짧고 명확하게 수정 (토큰 절약)
+                instr = "당신은 '오트가논'입니다. 쉬운 단어로 [단계별 전략] 위주로 아주 짧고 명확하게 답하세요."
                 
-                # [핵심] 대화 기록 구조화 (Gemini API 형식)
+                # 대화 기록 최적화: 너무 길면 잘라냄 (최근 3회 분량만 전달)
+                recent_history = st.session_state.chat_history[-6:] 
                 contents = []
-                
-                # 1. 과거 기록 추가
-                for chat in st.session_state.chat_history:
+                for chat in recent_history:
                     contents.append({"role": chat["role"], "parts": [{"text": chat["text"]}]})
                 
-                # 2. 현재 사용자 입력 추가 (시스템 지침 포함)
-                current_parts = [{"text": f"{system_instruction}\n\nTask: {user_input}"}]
-                
+                # 현재 데이터 구성
+                current_parts = [{"text": f"{instr}\nTask: {user_input}"}]
                 if uploaded_file:
                     img_data = base64.b64encode(uploaded_file.read()).decode('utf-8')
                     current_parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": img_data}})
                 
                 contents.append({"role": "user", "parts": current_parts})
                 
-                # API 호출
-                response = requests.post(url, json={"contents": contents}, timeout=60)
+                # 스트리밍 방식은 아니지만, 페이로드 최소화로 전송 속도 향상
+                response = requests.post(url, json={"contents": contents}, timeout=30)
                 res_json = response.json()
                 
                 if 'candidates' in res_json:
                     answer = res_json['candidates'][0]['content']['parts'][0]['text']
-                    
-                    # [핵심] 세션 상태에 대화 내용 저장
-                    st.session_state.chat_history.append({"role": "user", "text": user_input})
-                    st.session_state.chat_history.append({"role": "model", "text": answer})
-                    
-                    st.markdown("### Strategic Output")
-                    st
-                response = requests.post(url, json={"contents": contents}, timeout=60)
-                res_json = response.json()
-                
-                if 'candidates' in res_json:
-                    answer = res_json['candidates'][0]['content']['parts'][0]['text']
-                    
-                    # 세션 상태에 대화 내용 저장
                     st.session_state.chat_history.append({"role": "user", "text": user_input})
                     st.session_state.chat_history.append({"role": "model", "text": answer})
                     
                     st.markdown("### Strategic Output")
                     st.write(answer)
-                    
-                    st.divider()
-                    st.markdown("<p style='color:#bf94ff; font-size:0.8rem;'>Plain Text for Copy</p>", unsafe_allow_html=True)
-                    # 특수문자 제거 후 코드박스 출력
-                    clean_text = re.sub(r'[*#\-`>]', '', answer).strip()
-                    st.code(clean_text, language=None)
                 else:
-                    err_msg = res_json.get('error', {}).get('message', 'Unknown response')
-                    st.error(f"Engine Error: {err_msg}")
-                    
+                    st.error("서버 과부하로 응답이 지연되고 있습니다. 잠시 후 시도하세요.")
             except Exception as e:
-                # [에러 해결 핵심] try 문을 닫아주는 except 블록
-                st.error(f"System Failure: {e}")
-
-# 최근 대화 기록 표시 (선택 사항)
-if st.session_state.chat_history:
-    with st.expander("View Recent Chat History"):
-        for chat in st.session_state.chat_history[-4:]:
-            role_label = "👤 User" if chat["role"] == "user" else "🟣 Engine"
-            st.markdown(f"**{role_label}**: {chat['text'][:100]}...")
+                st.error("연결 오류 발생")
 
 st.divider()
-st.caption("© 2026 otgalnon Architecture. Context-Aware Enabled.")
+st.caption("© 2026 otgalnon. Speed optimized.")

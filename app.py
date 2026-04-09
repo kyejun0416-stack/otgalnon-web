@@ -56,8 +56,9 @@ if "session_id" not in st.session_state:
     st.session_state.session_id = "otgalnon_main_session"
 
 # DB에서 과거 대화 내역 불러오기 (최초 1회 실행)
+# [수정 완료] st.session_id -> st.session_state.session_id
 if "messages" not in st.session_state:
-    st.session_state.messages = db.load(st.session_id)
+    st.session_state.messages = db.load(st.session_state.session_id)
 
 # ==========================================
 # 3. 프로젝트 핵심 로직 (시계방향 회전 등)
@@ -80,4 +81,15 @@ with st.sidebar:
     st.header("Project Status")
     st.write(f"현재 세션: `{st.session_state.session_id}`")
     if st.button("대화 화면 비우기"):
-        st.session_state
+        st.session_state.messages = []
+        st.rerun()
+
+# 1) 저장된 대화 내용을 화면에 출력
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# 2) 사용자 입력 처리
+if prompt := st.chat_input("명령어나 대화를 입력하세요..."):
+    
+    # 사용자 메시

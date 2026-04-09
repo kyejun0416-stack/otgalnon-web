@@ -43,6 +43,12 @@ class ChatManager:
             )
             return [{"role": r, "content": c} for r, c in cursor.fetchall()]
 
+    def get_total_count(self):
+        """저장된 전체 메시지 수를 반환합니다."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute("SELECT COUNT(*) FROM chat_log")
+            return cursor.fetchone()[0]
+
 # ==========================================
 # 2. 앱 초기 설정 및 데이터베이스 연결
 # ==========================================
@@ -72,14 +78,23 @@ def process_otgalnon_command(command):
 # ==========================================
 # 4. UI 레이아웃 및 채팅 로직
 # ==========================================
-st.title("🚀 otgalnon 개발 엔진 v2.0")
+st.title("🚀 otgalnon 개발 엔진 v2.1")
 st.info("모든 대화 기록은 'otgalnon_history.db' 파일에 자동으로 기록됩니다.")
 
 # 사이드바 설정
 with st.sidebar:
-    st.header("Project Status")
+    st.header("📊 Project Status")
     st.write(f"현재 세션: `{st.session_state.session_id}`")
-    if st.button("대화 화면 비우기"):
+    
+    # 통계 정보 표시
+    total_msg = db.get_total_count()
+    st.metric(label="누적 기록된 메시지", value=f"{total_msg}개")
+    
+    st.divider()
+    
+    if st.button("🆕 새 대화 시작"):
+        # 새로운 타임스탬프로 세션 ID 갱신
+        st.session_state.session_id = f"session_{datetime.now().strftime('%m%d_%H%M')}"
         st.session_state.messages = []
         st.rerun()
 
@@ -88,7 +103,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# 2) 사용자 입력 처리 (여기가 93라인 근처입니다)
+# 2) 사용자 입력 처리
 if prompt := st.chat_input("명령어나 대화를 입력하세요..."):
     # 사용자 메시지 화면 표시
     with st.chat_message("user"):
@@ -107,3 +122,6 @@ if prompt := st.chat_input("명령어나 대화를 입력하세요..."):
     # 세션 상태 및 DB에 AI 메시지 저장
     st.session_state.messages.append({"role": "assistant", "content": response})
     db.save(st.session_state.session_id, "assistant", response)
+    
+    # 통계 업데이트를 위해 재실행 (선택 사항)
+    st.rerun()

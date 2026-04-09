@@ -1,102 +1,65 @@
 import streamlit as st
-import requests
-import base64
-import re
-import os
+import sqlite3
+from datetime import datetime
 
-# 1. 페이지 설정
-st.set_page_config(page_title="otgalnon", page_icon="logo.png", layout="centered")
+# ==========================================
+# 1. 데이터베이스 관리 클래스 (저장소 엔진)
+# ==========================================
+class ChatManager:
+    def __init__(self, db_path="otgalnon_history.db"):
+        self.db_path = db_path
+        self._init_db()
 
-# 2. 보라색 테마 디자인
-st.markdown("""
-    <style>
-    .stApp { background-color: #0e1117; }
-    .stTextArea textarea { background-color: #1e1e2e !important; color: #ffffff !important; border: 1px solid #4b0082 !important; }
-    .stButton button { width: 100%; border-radius: 8px; font-weight: bold; background-color: #4b0082; color: white; border: none; height: 3.5em; }
-    code { color: #bf94ff !important; background-color: #16161d !important; }
-    </style>
-    """, unsafe_allow_html=True)
+    def _init_db(self):
+        """데이터베이스 파일과 테이블을 생성합니다."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS chat_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT,
+                    role TEXT,
+                    content TEXT,
+                    timestamp DATETIME
+                )
+            ''')
+            conn.commit()
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+    def save(self, session_id, role, content):
+        """대화 내역을 DB 파일에 저장합니다."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO chat_log (session_id, role, content, timestamp) VALUES (?, ?, ?, ?)",
+                (session_id, role, content, datetime.now())
+            )
+            conn.commit()
 
-# 3. 헤더
-col1, col2 = st.columns([1, 5])
-with col1:
-    if os.path.exists("logo.png"): st.image("logo.png", width=80)
-    else: st.write("🟣")
-with col2:
-    st.title("otgalnon")
-    st.caption("Strategic Insight & Multi-Model Engine")
+    def load(self, session_id):
+        """저장된 대화 내역을 불러옵니다."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT role, content FROM chat_log WHERE session_id = ? ORDER BY timestamp ASC",
+                (session_id,)
+            )
+            return [{"role": r, "content": c} for r, c in cursor.fetchall()]
 
-st.divider()
+# ==========================================
+# 2. 앱 초기 설정 및 엔진 가동
+# ==========================================
+st.set_page_config(page_title="otgalnon 프로젝트", page_icon="⚙️")
+db = ChatManager()
 
-# 4. 입력 인터페이스
-user_input = st.text_area("분석 과제 입력", placeholder="내용을 입력하세요.", height=150)
-uploaded_file = st.file_uploader("이미지 데이터", type=["jpg", "jpeg", "png"])
+# 세션 ID 고정 (앱 재시작 시 대화 복구용)
+if "session_id" not in st.session_state:
+    st.session_state.session_id = "otgalnon_main_session"
 
-# 5. API 및 모델 라우팅 (중요!)
-api_key = st.secrets.get("GEMINI_API_KEY")
+# DB에서 과거 대화 불러오기
+if "messages" not in st.session_state:
+    st.session_state.messages = db.load(st.session_id)
 
-with st.sidebar:
-    st.title("Fuel Gauge (Quota)")
-    # 대시보드에서 확인한 할당량 넉넉한 모델들 추가
-    model_choice = st.selectbox(
-        "Select Engine", 
-        ["gemini-2.5-flash", "gemini-2-flash", "gemini-3-flash", "gemini-1.5-flash"],
-        index=0,
-        help="특정 모델의 할당량(RPD)이 소진되면 다른 모델로 변경하세요."
-    )
-    if st.button("Clear Memory"):
-        st.session_state.chat_history = []
-        st.rerun()
-    st.divider()
-    st.caption(f"Active Engine: {model_choice}")
-    st.caption("v9.0 | Multi-Model Routing")
-
-# 6. 엔진 가동 로직
-if st.button("RUN STRATEGY ENGINE"):
-    if not api_key:
-        st.error("API Key missing.")
-    elif not user_input and not uploaded_file:
-        st.warning("No input data.")
-    else:
-        with st.spinner(f"Refueling with {model_choice}..."):
-            try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_choice}:generateContent?key={api_key}"
-                instr = "당신은 '오트가논'입니다. 쉬운 단어로 [단계별 전략]을 명확히 답하세요."
-                
-                # 최적화된 대화 기록 (최근 2회분)
-                contents = []
-                for chat in st.session_state.chat_history[-4:]:
-                    contents.append({"role": chat["role"], "parts": [{"text": chat["text"]}]})
-                
-                current_parts = [{"text": f"{instr}\nTask: {user_input}"}]
-                if uploaded_file:
-                    img_data = base64.b64encode(uploaded_file.read()).decode('utf-8')
-                    current_parts.append({"inline_data": {"mime_type": uploaded_file.type, "data": img_data}})
-                
-                contents.append({"role": "user", "parts": current_parts})
-                
-                # API 호출
-                response = requests.post(url, json={"contents": contents}, timeout=60)
-                res_json = response.json()
-                
-                if 'candidates' in res_json:
-                    answer = res_json['candidates'][0]['content']['parts'][0]['text']
-                    st.session_state.chat_history.append({"role": "user", "text": user_input})
-                    st.session_state.chat_history.append({"role": "model", "text": answer})
-                    
-                    st.markdown("### Strategic Output")
-                    st.write(answer)
-                    st.divider()
-                    st.code(re.sub(r'[*#\-`>]', '', answer).strip(), language=None)
-                else:
-                    err_msg = res_json.get('error', {}).get('message', 'Quota Exceeded')
-                    st.error(f"Engine Out of Fuel: {err_msg}")
-                    st.info("💡 사이드바에서 다른 모델(Gemini 2.5 등)을 선택해 보세요.")
-            except Exception as e:
-                st.error(f"Critical System Failure: {e}")
-
-st.divider()
-st.caption("© 2026 otgalnon. Resilience optimized.")
+# ==========================================
+# 3. 프로젝트 핵심 로직 (회전 명령어 등)
+# ==========================================
+def process_otgalnon_command(command):
+    """기존에 개발하던 otgalnon 핵심 엔진 로직"""
+    if "시계방향" in command or "회전" in command:
+        #

@@ -1,6 +1,7 @@
 import streamlit as st
 import sqlite3
 from datetime import datetime
+import os
 
 # ==========================================
 # 1. 데이터베이스 관리 클래스 (저장소 엔진)
@@ -25,7 +26,7 @@ class ChatManager:
             conn.commit()
 
     def save(self, session_id, role, content):
-        """대화 내역을 DB 파일에 저장합니다."""
+        """대화 내역을 DB 파일에 물리적으로 저장합니다."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO chat_log (session_id, role, content, timestamp) VALUES (?, ?, ?, ?)",
@@ -34,7 +35,7 @@ class ChatManager:
             conn.commit()
 
     def load(self, session_id):
-        """저장된 대화 내역을 불러옵니다."""
+        """특정 세션의 대화 내역을 모두 가져옵니다."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 "SELECT role, content FROM chat_log WHERE session_id = ? ORDER BY timestamp ASC",
@@ -43,23 +44,40 @@ class ChatManager:
             return [{"role": r, "content": c} for r, c in cursor.fetchall()]
 
 # ==========================================
-# 2. 앱 초기 설정 및 엔진 가동
+# 2. 앱 초기 설정 및 데이터베이스 연결
 # ==========================================
 st.set_page_config(page_title="otgalnon 프로젝트", page_icon="⚙️")
+
+# 데이터베이스 관리자 객체 생성
 db = ChatManager()
 
-# 세션 ID 고정 (앱 재시작 시 대화 복구용)
+# 세션 ID 설정 (고정 ID를 사용하여 앱 재시작 시에도 내역 유지)
 if "session_id" not in st.session_state:
     st.session_state.session_id = "otgalnon_main_session"
 
-# DB에서 과거 대화 불러오기
+# DB에서 과거 대화 내역 불러오기 (최초 1회 실행)
 if "messages" not in st.session_state:
     st.session_state.messages = db.load(st.session_id)
 
 # ==========================================
-# 3. 프로젝트 핵심 로직 (회전 명령어 등)
+# 3. 프로젝트 핵심 로직 (시계방향 회전 등)
 # ==========================================
 def process_otgalnon_command(command):
-    """기존에 개발하던 otgalnon 핵심 엔진 로직"""
+    """기존 otgalnon 엔진 기능을 처리하는 함수"""
     if "시계방향" in command or "회전" in command:
-        #
+        return "🔄 엔진을 시계방향으로 회전 시켰습니다. (otgalnon command executed)"
+    else:
+        return f"입력하신 '{command}'에 대한 분석을 완료했습니다."
+
+# ==========================================
+# 4. UI 레이아웃 및 채팅 로직
+# ==========================================
+st.title("🚀 otgalnon 개발 엔진 v2.0")
+st.info("모든 대화 기록은 'otgalnon_history.db' 파일에 자동으로 기록됩니다.")
+
+# 사이드바 설정
+with st.sidebar:
+    st.header("Project Status")
+    st.write(f"현재 세션: `{st.session_state.session_id}`")
+    if st.button("대화 화면 비우기"):
+        st.session_state

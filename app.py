@@ -51,12 +51,11 @@ st.set_page_config(page_title="otgalnon 프로젝트", page_icon="⚙️")
 # 데이터베이스 관리자 객체 생성
 db = ChatManager()
 
-# 세션 ID 설정 (고정 ID를 사용하여 앱 재시작 시에도 내역 유지)
+# 세션 ID 설정
 if "session_id" not in st.session_state:
     st.session_state.session_id = "otgalnon_main_session"
 
-# DB에서 과거 대화 내역 불러오기 (최초 1회 실행)
-# [수정 완료] st.session_id -> st.session_state.session_id
+# DB에서 과거 대화 내역 불러오기
 if "messages" not in st.session_state:
     st.session_state.messages = db.load(st.session_state.session_id)
 
@@ -89,7 +88,22 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# 2) 사용자 입력 처리
+# 2) 사용자 입력 처리 (여기가 93라인 근처입니다)
 if prompt := st.chat_input("명령어나 대화를 입력하세요..."):
+    # 사용자 메시지 화면 표시
+    with st.chat_message("user"):
+        st.markdown(prompt)
     
-    # 사용자 메시
+    # 세션 상태 및 DB에 사용자 메시지 저장
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    db.save(st.session_state.session_id, "user", prompt)
+
+    # AI 응답 생성 및 처리
+    with st.chat_message("assistant"):
+        with st.spinner("엔진 연산 중..."):
+            response = process_otgalnon_command(prompt)
+            st.markdown(response)
+    
+    # 세션 상태 및 DB에 AI 메시지 저장
+    st.session_state.messages.append({"role": "assistant", "content": response})
+    db.save(st.session_state.session_id, "assistant", response)

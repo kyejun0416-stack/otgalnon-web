@@ -63,8 +63,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = memory.recall(st.session_state.session_id)
 
 # Gemini 설정
-api_key = "YOUR_GEMINI_API_KEY" # 실제 키로 교체 필요
-if api_key != "YOUR_GEMINI_API_KEY":
+api_key = "AIzaSyCIvzkjfmOP_L6DxJ3eC942x5luRcSy378" # 실제 키로 교체 필요
+if api_key != "AIzaSyCIvzkjfmOP_L6DxJ3eC942x5luRcSy378":
     genai.configure(api_key=api_key)
 
 # ==========================================

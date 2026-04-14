@@ -2,7 +2,59 @@ import streamlit as st
 import sqlite3
 from datetime import datetime
 import os
+import streamlit as st
 
+# ==========================================
+# 0. AI ENGINE CONFIGURATION (PRO MODEL)
+# ==========================================
+# Streamlit Secrets 또는 환경 변수에서 키를 가져오도록 설정
+# 로컬 테스트 시에는 .streamlit/secrets.toml 파일에 저장하세요.
+api_key = st.secrets.get("GEMINI_API_KEY")
+
+if api_key:
+    genai.configure(api_key=api_key)
+else:
+    st.warning("SYSTEM NOTICE: API Key가 감지되지 않았습니다. 관리자 설정을 확인하십시오.")
+
+def get_brain_engine():
+    # 지능의 극대화를 위해 시스템 명령어를 더욱 정교하게 강화
+    return genai.GenerativeModel(
+        model_name='gemini-1.5-pro',
+        system_instruction=(
+            "당신은 OTGALNON 프로젝트의 지식 아키텍트입니다. "
+            "단순 응답이 아닌, 제1원리(First Principles)에 기반하여 문제를 분석하십시오. "
+            "이모티콘을 철저히 배제하고, 논문 수준의 전문적인 한국어를 구사하십시오. "
+            "답변의 구조는 서론, 본론(심층 분석), 결론(실행 방안)의 형식을 갖추십시오."
+        )
+    )
+
+# ... (기존 UI 및 DB 로직 동일) ...
+
+# 명령어 입력 및 처리 섹션 수정
+if prompt := st.chat_input("Enter complex inquiry..."):
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    memory.record(st.session_state.session_id, "user", prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("EXECUTING NEURAL REASONING..."):
+            if api_key:
+                try:
+                    brain = get_brain_engine()
+                    # 이전 대화 맥락을 모두 반영하여 지능적 연결성 확보
+                    response = brain.generate_content(prompt)
+                    output = response.text
+                except Exception as e:
+                    output = f"SYSTEM ERROR: 분석 과정에서 예외가 발생했습니다. ({str(e)})"
+            else:
+                output = "CRITICAL: 유효한 API Key 없이 분석 프로세스를 시작할 수 없습니다."
+            
+            st.markdown(output)
+            st.code(output, language="markdown")
+    
+    st.session_state.messages.append({"role": "assistant", "content": output})
+    memory.record(st.session_state.session_id, "assistant", output)
 # 라이브러리 로드 시 예외 처리
 try:
     import google.generativeai as genai
@@ -113,3 +165,7 @@ if prompt := st.chat_input("Enter command..."):
     
     st.session_state.messages.append({"role": "assistant", "content": output})
     memory.record(st.session_state.session_id, "assistant", output)
+
+
+
+

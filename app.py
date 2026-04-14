@@ -4,56 +4,61 @@ from datetime import datetime
 import os
 
 # ==========================================
-# 1. 고급 보라색 테마 및 페이지 설정
+# 1. 고급 테마 및 페이지 설정 (이모티콘 제거)
 # ==========================================
+# 페이지 아이콘에 logo.png 적용 (파일이 없을 경우를 대비해 설정)
+page_icon_path = "logo.png" if os.path.exists("logo.png") else None
+
 st.set_page_config(
     page_title="otgalnon - Advanced Engine",
-    page_icon="💜",
+    page_icon=page_icon_path,
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# [디자인] 보라색 테마 및 고급진 UI 스타일링 복구
+# [디자인] 보라색 테마 및 고급진 UI 스타일링
 st.markdown("""
     <style>
-    /* 전체 배경 및 텍스트 톤 조절 */
     .main {
         background-color: #0f0c29;
         background: linear-gradient(to bottom, #0f0c29, #302b63, #24243e);
         color: #ffffff;
     }
-    
-    /* 사이드바 스타일 */
     [data-testid="stSidebar"] {
         background-color: rgba(30, 30, 50, 0.9);
         border-right: 1px solid #6d5dfc;
     }
-    
-    /* 채팅 메시지 박스 커스텀 */
     .stChatMessage {
         background-color: rgba(255, 255, 255, 0.05) !important;
         border: 1px solid rgba(109, 93, 252, 0.3);
-        border-radius: 15px !important;
+        border-radius: 12px !important;
         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
-    
-    /* 강조 색상 (보라색 포인트) */
     .stTextInput>div>div>input {
         color: #e0e0e0;
         background-color: #1e1e32;
         border-color: #6d5dfc !important;
     }
-    
-    /* 버튼 스타일 */
     .stButton>button {
         background: linear-gradient(45deg, #6d5dfc, #b83af3);
         color: white;
         border: none;
         transition: 0.3s;
+        text-transform: uppercase;
+        font-weight: bold;
+        letter-spacing: 1px;
     }
     .stButton>button:hover {
         transform: scale(1.02);
         box-shadow: 0 0 15px #6d5dfc;
+    }
+    /* 로고 이미지 정렬 */
+    [data-testid="stSidebar"] [data-testid="stImage"] {
+        text-align: center;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        padding-top: 10px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -67,7 +72,6 @@ class ChatManager:
         self._init_db()
 
     def _init_db(self):
-        """데이터베이스 파일과 테이블을 생성합니다."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS chat_log (
@@ -81,7 +85,6 @@ class ChatManager:
             conn.commit()
 
     def save(self, session_id, role, content):
-        """대화 내역을 DB 파일에 물리적으로 저장합니다."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 "INSERT INTO chat_log (session_id, role, content, timestamp) VALUES (?, ?, ?, ?)",
@@ -90,7 +93,6 @@ class ChatManager:
             conn.commit()
 
     def load(self, session_id):
-        """특정 세션의 대화 내역을 모두 가져옵니다."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 "SELECT role, content FROM chat_log WHERE session_id = ? ORDER BY timestamp ASC",
@@ -99,31 +101,32 @@ class ChatManager:
             return [{"role": r, "content": c} for r, c in cursor.fetchall()]
 
 # ==========================================
-# 3. 데이터 및 세션 초기화
+# 3. 데이터 초기화
 # ==========================================
 db = ChatManager()
 
 if "session_id" not in st.session_state:
     st.session_state.session_id = "otgalnon_main_session"
 
-# 앱 시작 시 DB에서 기존 내역 로드
 if "messages" not in st.session_state:
     st.session_state.messages = db.load(st.session_state.session_id)
 
 # ==========================================
-# 4. 사이드바 및 로고 영역 (완벽 복구)
+# 4. 사이드바 및 로고 제어
 # ==========================================
 with st.sidebar:
-    # [수정] 사라졌던 HTML 로고 다시 추가
-    st.markdown("<h1 style='text-align: center; color: #b83af3;'>🟣 OTGALNON</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; font-size: 0.8rem;'>Advanced Research Engine</p>", unsafe_allow_html=True)
+    if os.path.exists("logo.png"):
+        st.image("logo.png", use_column_width=True)
+    else:
+        st.markdown("<h1 style='text-align: center; color: #b83af3;'>OTGALNON</h1>", unsafe_allow_html=True)
+    
+    st.markdown("<p style='text-align: center; font-size: 0.75rem; color: #a0a0a0; margin-top: -10px;'>ADVANCED RESEARCH ENGINE</p>", unsafe_allow_html=True)
     st.divider()
     
-    st.write(f"📡 **System Status:** `Active`")
-    st.write(f"📂 **Session:** `{st.session_state.session_id}`")
+    st.write(f"System Status: **ACTIVE**")
+    st.write(f"Current Session: `{st.session_state.session_id}`")
     
-    if st.button("✨ New Workspace"):
-        # 새로운 타임스탬프로 세션 ID 갱신
+    if st.button("New Workspace"):
         st.session_state.session_id = f"session_{datetime.now().strftime('%m%d_%H%M')}"
         st.session_state.messages = []
         st.rerun()
@@ -132,67 +135,55 @@ with st.sidebar:
     st.caption("Developed by User | Powered by otgalnon Core")
 
 # ==========================================
-# 5. 지적인 AI 페르소나 응답 로직
+# 5. 분석적 답변 로직 (이모티콘 제거)
 # ==========================================
 def process_command(text):
-    """전문적이고 분석적인 AI 답변 페르소나 적용"""
     cmd = text.strip()
-    
     if "회전" in cmd or "시계방향" in cmd:
         return (
-            "### 🔄 Engine Control Sequence\n"
-            "시스템 프로토콜에 의거하여 **시계방향 회전** 명령을 수신했습니다.\n\n"
-            "- **수행 결과:** 서보 모터 정밀 제어 완료\n"
-            "- **현재 상태:** 90도 회전 후 고정됨\n"
-            "추가적인 캘리브레이션이 필요하시면 말씀해 주십시오."
+            "### Engine Control Sequence\n"
+            "시스템 프로토콜에 의거하여 시계방향 회전 명령을 수신했습니다.\n\n"
+            "- 수행 결과: 서보 모터 정밀 제어 완료\n"
+            "- 현재 상태: 90도 회전 후 고정됨\n"
+            "추가적인 캘리브레이션이 필요하시면 명령을 입력하십시오."
         )
     elif "라면" in cmd:
         return (
-            "### 🍜 가이드: 최적의 조리 알고리즘\n"
-            "시스템 데이터베이스에 저장된 가장 효율적인 라면 조리법입니다.\n\n"
-            "1. **Water:** 550ml의 물을 가열 장치로 비등점까지 끌어올립니다.\n"
-            "2. **Process:** 면과 스프를 투입한 후 4분간 일정한 온도를 유지하십시오.\n"
-            "3. **Result:** 최상의 식감을 위한 연산 결과가 도출되었습니다."
+            "### 가이드: 조리 알고리즘 분석\n"
+            "시스템 데이터베이스에 저장된 최적의 조리 시퀀스입니다.\n\n"
+            "1. Water: 550ml의 물을 가열 장치로 비등점까지 도달시킵니다.\n"
+            "2. Process: 물이 끓기 시작하면 면과 수프를 투입하고 4분간 일정한 열량을 유지하십시오.\n"
+            "3. Result: 연산 결과에 따른 최상의 조리 상태가 도출되었습니다."
         )
     else:
         return (
-            f"### ✅ Operation Analysis\n"
-            f"입력 데이터 `{cmd}`에 대한 분석을 완료했습니다.\n\n"
-            "현재 엔진은 최적화된 대기 상태입니다."
+            f"### Operation Analysis\n"
+            f"입력 데이터 '{cmd}'에 대한 분석이 완료되었습니다.\n\n"
+            "시스템은 현재 최적화된 대기 상태를 유지하고 있습니다."
         )
 
 # ==========================================
-# 6. 메인 채팅 인터페이스 (복사 기능 포함)
+# 6. 메인 제어 센터 (이모티콘 제거)
 # ==========================================
-st.markdown("<h2 style='color: #b83af3;'>⚙️ otgalnon Control Center</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='color: #b83af3; letter-spacing: 2px;'>OTGALNON CONTROL CENTER</h2>", unsafe_allow_html=True)
 
-# 1) 저장된 대화 내용을 화면에 출력
+# 메시지 출력
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        if msg["role"] == "assistant":
-            # 복사가 쉬운 코드 블록 형태로도 제공
-            st.code(msg["content"], language="markdown")
 
-# 2) 사용자 입력 처리
-if prompt := st.chat_input("Enter command or query..."):
-    # 사용자 메시지 화면 표시
+# 명령어 입력
+if prompt := st.chat_input("Enter command..."):
     with st.chat_message("user"):
         st.markdown(prompt)
-    
-    # 세션 상태 및 DB에 사용자 메시지 저장
     st.session_state.messages.append({"role": "user", "content": prompt})
     db.save(st.session_state.session_id, "user", prompt)
 
-    # AI 응답 생성 및 처리
     with st.chat_message("assistant"):
         with st.spinner("Analyzing..."):
-            # 이제 이 함수가 풍부한 답변을 내뱉습니다!
-            full_response = process_command(prompt) 
-            st.markdown(full_response)
-            # 복사 편의성을 위해 코드 블록 스타일 추가
-            st.code(full_response, language="markdown") 
+            response = process_command(prompt)
+            st.markdown(response)
+            st.code(response, language="markdown")
     
-    # 세션 상태 및 DB에 AI 메시지 저장
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
-    db.save(st.session_state.session_id, "assistant", full_response)
+    st.session_state.messages.append({"role": "assistant", "content": response})
+    db.save(st.session_state.session_id, "assistant", response)

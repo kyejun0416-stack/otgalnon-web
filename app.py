@@ -55,7 +55,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = db.load(st.session_state.session_id)
 
 # ==========================================
-# 4. 고성능 AI 추론 엔진 (Gemini 1.5 Pro)
+# 4. 고성능 AI 추론 엔진 (Gemini 2.5 Pro)
 # ==========================================
 def run_hyper_inference(user_input):
     # Streamlit Secrets에서 API Key 로드
@@ -67,9 +67,9 @@ def run_hyper_inference(user_input):
         genai.configure(api_key=api_key)
         
         # 404 에러 방지를 위한 표준 모델명 설정
-        # 지능 고도화를 위해 반드시 'gemini-1.5-pro' 사용
+        # 지능 고도화를 위해 반드시 'gemini-2.5-pro' 사용
         model = genai.GenerativeModel(
-            model_name='gemini-1.5-pro',
+            model_name='gemini-2.5-pro',
             system_instruction=(
                 "당신은 OTGALNON의 핵심 지능 아키텍트입니다. "
                 "사용자의 요청에 대해 단순 대답을 지양하고, 다각적인 심층 분석을 수행하십시오. "

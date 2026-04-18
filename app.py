@@ -1,40 +1,84 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 import os
 
 # ==========================================
 # 1. 아키텍처 설정
 # ==========================================
-st.set_page_config(page_title="OTGALNON v4.5", layout="wide")
+st.set_page_config(page_title="OTGALNON v5.2", layout="wide")
 
-# 사이드바에서 현재 사용 가능한 모델 리스트 확인 기능 추가
-def get_available_models():
+# 사이드바: 모델 자동 탐지 로직
+def initialize_engine():
     api_key = st.secrets.get("GEMINI_API_KEY")
-    if not api_key: return []
-    genai.configure(api_key=api_key)
-    return [m.name.replace('models/', '') for m in genai.list_models()]
-
-# ==========================================
-# 2. 하이퍼 추론 엔진 (Gemini 3.1 Flash)
-# ==========================================
-def run_otgalnon_engine(user_input, selected_model):
-    api_key = st.secrets.get("GEMINI_API_KEY")
-    genai.configure(api_key=api_key)
+    if not api_key:
+        return None, "API 키가 없습니다."
     
     try:
-        # 정확한 모델명으로 인스턴스 생성
-        model = genai.GenerativeModel(
-            model_name=selected_model,
-            system_instruction=(
-                "당신은 OTGALNON의 최고 분석관입니다. "
-                "이모티콘을 금지하며, 제1원리 추론(First Principles Thinking)에 기반해 답변하십시오. "
-                "모든 분석은 논리적 근거와 함께 데이터 중심으로 서술하십시오."
-            )
-        )
-        response = model.generate_content(user_input)
-        return response.text
+        client = genai.Client(api_key=api_key)
+        # 현재 접근 가능한 모든 모델 리스트 확보
+        available_models = [m.name for m in client.models.list()]
+        
+        # 'gemini-3-flash'가 포함된 가장 정확한 ID 찾기
+        target_id = next((m for m in available_models if "gemini-3-flash" in m), None)
+        
+        if not target_id:
+            # 3버전이 없으면 1.5 버전이라도 탐색
+            target_id = next((m for m in available_models if "gemini-1.5-flash" in m), "gemini-1.5-flash")
+            
+        return client, target_id
     except Exception as e:
-        return f"CRITICAL ENGINE FAILURE: {str(e)}"
+        return None, str(e)
+
+client, active_model_id = initialize_engine()
+
+# ==========================================
+# 2. 메인 컨트롤 센터 UI
+# ==========================================
+with st.sidebar:
+    st.markdown("### SYSTEM STATUS")
+    if client:
+        st.success(f"ACTIVE ID: {active_model_id}")
+        st.caption("시스템이 정확한 식별자를 자동으로 탐지했습니다.")
+    else:
+        st.error("엔진 연결 실패")
+    
+    if st.button("RESET WORKSPACE"):
+        st.session_state.messages = []
+        st.rerun()
+
+st.markdown("<h2 style='color: #6d5dfc; font-weight: 300;'>OTGALNON CONTROL CENTER</h2>", unsafe_allow_html=True)
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# 대화 로그 출력
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# 입력 처리
+if prompt := st.chat_input("연구 명령을 입력하십시오..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        if client:
+            with st.spinner("HYPER-ANALYSIS IN PROGRESS..."):
+                try:
+                    response = client.models.generate_content(
+                        model=active_model_id,
+                        contents=prompt,
+                        config={"system_instruction": "당신은 OTGALNON의 분석관입니다. 이모티콘 금지, 논리적 답변 필수."}
+                    )
+                    answer = response.text
+                    st.markdown(answer)
+                    st.code(answer, language="markdown")
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                except Exception as e:
+                    st.error(f"RUNTIME ERROR: {str(e)}")
+        else:
+            st.warning("엔진이 준비되지 않았습니다. API 설정을 확인하십시오.")
 
 # ==========================================
 # 3. 메인 인터페이스

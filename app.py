@@ -3,92 +3,75 @@ import google.generativeai as genai
 import os
 
 # ==========================================
-# 1. 시스템 설정 및 테마 (이모티콘 완전 배제)
+# 1. 아키텍처 설정
 # ==========================================
-st.set_page_config(
-    page_title="OTGALNON v4.1 - Hyper Intelligence",
-    layout="wide"
-)
+st.set_page_config(page_title="OTGALNON v4.5", layout="wide")
 
-# OTGALNON 전용 다크 보라 테마
-st.markdown("""
-    <style>
-    .main { background-color: #0b091a; color: #d1d1d1; }
-    [data-testid="stSidebar"] { background-color: #0e0c1f; border-right: 1px solid #4b3d8f; }
-    .stChatMessage { background-color: rgba(75, 61, 143, 0.1) !important; border: 1px solid #4b3d8f; border-radius: 12px !important; }
-    .stButton>button { background: linear-gradient(45deg, #4b3d8f, #6d5dfc); color: white; border: none; font-weight: 600; width: 100%; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# ==========================================
-# 2. 세션 및 메모리 관리
-# ==========================================
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# ==========================================
-# 3. Gemini 3 Flash 추론 엔진
-# ==========================================
-def run_gemini3_engine(user_input):
+# 사이드바에서 현재 사용 가능한 모델 리스트 확인 기능 추가
+def get_available_models():
     api_key = st.secrets.get("GEMINI_API_KEY")
-    if not api_key:
-        return "CRITICAL ERROR: API Key가 감지되지 않았습니다. Secrets를 확인하십시오."
+    if not api_key: return []
+    genai.configure(api_key=api_key)
+    return [m.name.replace('models/', '') for m in genai.list_models()]
 
+# ==========================================
+# 2. 하이퍼 추론 엔진 (Gemini 3.1 Flash)
+# ==========================================
+def run_otgalnon_engine(user_input, selected_model):
+    api_key = st.secrets.get("GEMINI_API_KEY")
+    genai.configure(api_key=api_key)
+    
     try:
-        genai.configure(api_key=api_key)
-        
-        # 사용자님의 요청에 따라 Gemini 3 Flash 모델 강제 지정
-        # 최신 SDK에서는 'gemini-3-flash' 명칭을 사용합니다.
+        # 정확한 모델명으로 인스턴스 생성
         model = genai.GenerativeModel(
-            model_name='gemini-3-flash',
+            model_name=selected_model,
             system_instruction=(
-                "당신은 OTGALNON의 하이퍼 분석 엔진입니다. "
-                "텍스트에서 모든 이모티콘을 엄격히 배제하십시오. "
-                "사용자의 질문에 대해 제1원리 추론을 바탕으로 전문적이고 구조적인 해답을 제시하십시오. "
-                "답변은 보고서 형식(분석-추론-결론)으로 출력하십시오."
+                "당신은 OTGALNON의 최고 분석관입니다. "
+                "이모티콘을 금지하며, 제1원리 추론(First Principles Thinking)에 기반해 답변하십시오. "
+                "모든 분석은 논리적 근거와 함께 데이터 중심으로 서술하십시오."
             )
         )
-        
-        # 추론 실행
         response = model.generate_content(user_input)
         return response.text
     except Exception as e:
-        # 모델명 호환성 체크 (과도기적 명칭 대응)
-        if "404" in str(e):
-            return "ERROR: 현재 API 버전에서 'gemini-3-flash' 모델명을 찾을 수 없습니다. SDK 업데이트를 확인하십시오."
-        return f"ENGINE ERROR: {str(e)}"
+        return f"CRITICAL ENGINE FAILURE: {str(e)}"
 
 # ==========================================
-# 4. 메인 컨트롤 인터페이스
+# 3. 메인 인터페이스
 # ==========================================
 with st.sidebar:
-    if os.path.exists("logo.png"):
-        st.image("logo.png")
-    st.markdown("<h3 style='text-align: center;'>OTGALNON v4.1</h3>", unsafe_allow_html=True)
-    st.write("CORE: **Gemini 3 Flash**")
-    st.divider()
-    if st.button("RESET WORKSPACE"):
+    st.markdown("### SYSTEM MONITOR")
+    # 모델 자동 감지 및 선택
+    available_models = get_available_models()
+    # 스크린샷의 모델이 있으면 우선 선택, 없으면 최신 Flash 선택
+    default_model = 'gemini-3.1-flash-preview'
+    if 'gemini-3.1-flash-live-preview' in available_models:
+        default_model = 'gemini-3.1-flash-live-preview'
+        
+    target_model = st.selectbox("ACTIVE MODEL", available_models, index=available_models.index(default_model) if default_model in available_models else 0)
+    st.info(f"QUOTA TYPE: UNLIMITED (Detected)")
+    
+    if st.button("REBOOT SYSTEM"):
         st.session_state.messages = []
         st.rerun()
 
 st.markdown("<h2 style='color: #6d5dfc; font-weight: 300;'>OTGALNON CONTROL CENTER</h2>", unsafe_allow_html=True)
 
-# 히스토리 렌더링
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# 입력 처리
 if prompt := st.chat_input("Enter research command..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-    st.session_state.messages.append({"role": "user", "content": prompt})
 
     with st.chat_message("assistant"):
-        with st.spinner("PERFORMING NEURAL ANALYSIS..."):
-            answer = run_gemini3_engine(prompt)
+        with st.spinner("PROCESSING THROUGH HYPER-NEURAL NETWORK..."):
+            answer = run_otgalnon_engine(prompt, target_model)
             st.markdown(answer)
-            # 전문가용 데이터 복사 코드 블록
             st.code(answer, language="markdown")
-
-    st.session_state.messages.append({"role": "assistant", "content": answer})
+            st.session_state.messages.append({"role": "assistant", "content": answer})

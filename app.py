@@ -7,6 +7,22 @@ import google.generativeai as genai
 # 파비콘을 logo.png로 교체하고 레이아웃을 와이드로 설정
 st.set_page_config(page_title="OTGALNON", page_icon="logo.png", layout="wide")
 
+# 아바타 아이콘 제거 및 여백 최적화 CSS
+st.markdown("""
+    <style>
+    /* 1. 사람 및 로봇 아바타 영역 완전히 숨기기 */
+    div[data-testid="stChatMessageAvatar"] {
+        display: none !important;
+    }
+    
+    /* 2. 아이콘이 사라진 빈 공간(여백) 제거 및 텍스트 왼쪽 정렬 */
+    div[data-testid="stChatMessage"] {
+        gap: 0rem !important;
+        padding-left: 0.5rem !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # 모던 챗봇 스타일을 위한 커스텀 CSS 주입
 st.markdown("""
     <style>

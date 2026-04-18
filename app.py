@@ -2,6 +2,7 @@ import streamlit as st
 import sqlite3
 from datetime import datetime
 import os
+import time
 
 # 1. 라이브러리 로드
 try:
@@ -10,7 +11,7 @@ except ImportError:
     st.error("SYSTEM ERROR: 'google-generativeai' 라이브러리가 필요합니다.")
 
 # ==========================================
-# 2. 페이지 및 테마 설정 (이모티콘 배제)
+# 2. 페이지 및 테마 설정
 # ==========================================
 page_icon_path = "logo.png" if os.path.exists("logo.png") else None
 st.set_page_config(
@@ -19,7 +20,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# 보라색 다크 테마 적용
 st.markdown("""
     <style>
     .main { background-color: #0b091a; color: #d1d1d1; }
@@ -30,7 +30,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. 데이터베이스 엔진 (메모리 관리)
+# 3. 데이터베이스 엔진
 # ==========================================
 class MemoryEngine:
     def __init__(self, db_path="otgalnon_history.db"):
@@ -50,46 +50,41 @@ class MemoryEngine:
             return [{"role": r, "content": c} for r, c in cursor.fetchall()]
 
 db = MemoryEngine()
-
-# 세션 상태 초기화
 if "session_id" not in st.session_state:
-    st.session_state.session_id = "otgalnon_v3_5_stable"
+    st.session_state.session_id = "otgalnon_stable_v4"
 if "messages" not in st.session_state:
     st.session_state.messages = db.load(st.session_state.session_id)
 
 # ==========================================
-# 4. 하이브리드 지능 엔진 (할당량 초과 대비)
+# 4. 하이퍼 추론 엔진 (에러 복구 로직 포함)
 # ==========================================
 def run_intelligent_inference(user_input):
     api_key = st.secrets.get("GEMINI_API_KEY")
     if not api_key:
-        return "CRITICAL ERROR: API Key가 존재하지 않습니다. Streamlit Secrets를 확인하십시오."
+        return "CRITICAL ERROR: API Key가 존재하지 않습니다."
 
     genai.configure(api_key=api_key)
     
-    # 지능 순서대로 모델 리스트업 (할당량 초과 시 자동 전환)
-    # 사용자님이 원하시는 2.0 및 상위 지능 모델 포함
+    # 가용 모델 리스트 (사용 가능한 것을 순차적으로 시도)
     model_candidates = ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash']
     
     for model_name in model_candidates:
         try:
             model = genai.GenerativeModel(
                 model_name=model_name,
-                system_instruction=(
-                    "당신은 OTGALNON의 최고 지능 분석 엔진입니다. "
-                    "이모티콘 사용을 엄격히 금지하며, 고도로 정제된 전문용어와 논리적 구조를 사용하십시오. "
-                    "단순한 응답을 넘어선 깊이 있는 통찰력(Insight)을 제시하십시오."
-                )
+                system_instruction="이모티콘을 배제하고 논리적이고 전문적인 분석 결과를 제공하십시오."
             )
             response = model.generate_content(user_input)
             return f"**[ENGINE: {model_name}]**\n\n{response.text}"
         except Exception as e:
-            # 429(할당량 초과) 에러가 나면 다음 모델로 시도
-            if "429" in str(e):
+            err_msg = str(e)
+            if "429" in err_msg: # 할당량 초과 시
+                st.warning(f"{model_name} 할당량 초과. 다음 엔진으로 전환합니다...")
+                time.sleep(2) # 짧은 대기 후 전환
                 continue
-            return f"SYSTEM ERROR: 엔진 구동 중 예외가 발생했습니다. ({str(e)})"
+            return f"SYSTEM ERROR: {err_msg}"
     
-    return "ALL ENGINES EXHAUSTED: 모든 사용 가능한 모델의 할당량이 소진되었습니다. 잠시 후 다시 시도하십시오."
+    return "제한 사항: 현재 모든 엔진의 할당량이 소진되었습니다. 약 1분 후 다시 시도해 주십시오."
 
 # ==========================================
 # 5. UI 구성 및 실행
@@ -99,26 +94,24 @@ with st.sidebar:
         st.image("logo.png")
     st.markdown("<h2 style='text-align: center;'>OTGALNON</h2>", unsafe_allow_html=True)
     st.divider()
-    if st.button("RESET WORKSPACE"):
+    if st.button("RESET"):
         st.session_state.messages = []
         st.rerun()
 
-st.markdown("<h2 style='color: #6d5dfc; font-weight: 300; letter-spacing: 1px;'>OTGALNON CONTROL CENTER</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='color: #6d5dfc; font-weight: 300;'>CONTROL CENTER</h2>", unsafe_allow_html=True)
 
-# 메시지 출력
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# 입력창
-if prompt := st.chat_input("Enter research query..."):
+if prompt := st.chat_input("Enter command..."):
     with st.chat_message("user"):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
     db.save(st.session_state.session_id, "user", prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("EXECUTING HYPER-ANALYSIS..."):
+        with st.spinner("ANALYZING..."):
             answer = run_intelligent_inference(prompt)
             st.markdown(answer)
             st.code(answer, language="markdown")

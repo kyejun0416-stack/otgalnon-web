@@ -56,7 +56,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = db.load(st.session_state.session_id)
 
 # ==========================================
-# 4. 하이퍼 추론 엔진 (Gemini 2.0 적용)
+# 4. 하이퍼 추론 엔진 (Gemini 2.5
+ 적용)
 # ==========================================
 def run_ai_inference(user_input):
     api_key = st.secrets.get("GEMINI_API_KEY")
@@ -66,9 +67,9 @@ def run_ai_inference(user_input):
     try:
         genai.configure(api_key=api_key)
         
-        # [수정 포인트] 1.5 Pro 대신 Gemini 2.0 Flash 사용
-        # 지원 여부에 따라 'gemini-2.0-flash' 또는 'gemini-2.0-flash-exp' 사용
-        model_name = 'gemini-2.0-flash' 
+        # [수정 포인트] 1.5 Pro 대신 Gemini 2.5 Flash 사용
+        # 지원 여부에 따라 'gemini-2.5-flash' 또는 'gemini-2.5-flash-exp' 사용
+        model_name = 'gemini-2.5-flash' 
         
         model = genai.GenerativeModel(
             model_name=model_name,
@@ -85,7 +86,7 @@ def run_ai_inference(user_input):
     except Exception as e:
         # 404 에러 등이 날 경우 모델명을 -exp 버전으로 자동 전환 시도 (fallback)
         if "404" in str(e):
-            return "ANALYSIS FAILED: 지정된 모델(2.0 Flash)을 현재 리전에서 사용할 수 없습니다. API 설정을 확인하십시오."
+            return "ANALYSIS FAILED: 지정된 모델(2.5 Flash)을 현재 리전에서 사용할 수 없습니다. API 설정을 확인하십시오."
         return f"SYSTEM ERROR: 엔진 구동 실패. (사유: {str(e)})"
 
 # ==========================================

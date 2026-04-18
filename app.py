@@ -2,88 +2,87 @@ import streamlit as st
 import google.generativeai as genai
 
 # ==========================================
-# 1. 아키텍처 및 시스템 설정 (최상단 고정)
+# 1. 엔진 설정 (자동 탐지 로직 유지)
 # ==========================================
-st.set_page_config(page_title="OTGALNON", layout="wide")
+st.set_page_config(page_title="OTGALNON v6.0", layout="wide")
 
-def initialize_otgalnon():
-    """사용자 계정의 무제한 쿼터 모델을 자동 탐색 및 연결"""
+def get_engine():
     api_key = st.secrets.get("GEMINI_API_KEY")
-    if not api_key:
-        return None, "API Key Missing"
-    
+    if not api_key: return None, "API Key Missing"
     genai.configure(api_key=api_key)
     try:
-        # 실제 호출 가능한 모델 리스트 확인
         model_list = [m.name for m in genai.list_models()]
-        
-        # [정확한 ID 매핑] 스크린샷의 'Gemini 3 Flash' 식별자 탐색
+        # 스크린샷에서 확인한 Gemini 3 Flash 계열 우선 선택
         target = next((m for m in model_list if "gemini-3-flash" in m), "models/gemini-1.5-flash")
-        
-        # 엔진 인스턴스 생성 및 시스템 지시문 주입
-        model = genai.GenerativeModel(
-            model_name=target,
-            system_instruction=(
-                "당신은 OTGALNON의 최고 분석관입니다. "
-                "이모티콘 사용을 엄격히 금지하며, 제1원리 추론에 기반해 답변하십시오. "
-                "스크립트 요청 시에는 주석이 포함된 실행 가능한 코드를 제공하십시오."
-            )
-        )
-        return model, target
-    except Exception as e:
-        return None, str(e)
+        return target
+    except: return "models/gemini-1.5-flash"
 
-# 엔진 초기화
-engine, active_id = initialize_otgalnon()
+active_model_id = get_engine()
 
 # ==========================================
-# 2. 오리지널 인터페이스 레이아웃
+# 2. 사이드바 제어판 (모드 선택 추가)
 # ==========================================
 with st.sidebar:
-    st.markdown("### SYSTEM STATUS")
-    if engine:
-        # UI 이름과 시스템 ID 사이의 간극 해결
-        st.success(f"ONLINE: {active_id}")
-        st.caption("Gemini 3 Flash 엔진 연결 완료")
-    else:
-        st.error(f"OFFLINE: {active_id}")
+    st.title("OTGALNON v6.0")
+    st.success(f"CORE: {active_model_id}")
     
-    if st.button("RESET"):
+    # [핵심 추가] 스크립트 생성 모드 스위치
+    gen_mode = st.radio("OPERATING MODE", ["General Research", "Script Generator"])
+    
+    st.divider()
+    if st.button("CLEAR TERMINAL"):
         st.session_state.messages = []
         st.rerun()
 
-st.markdown("<h2 style='color: #6d5dfc; font-weight: 300;'>OTGALNON CONTROL CENTER</h2>", unsafe_allow_html=True)
+# ==========================================
+# 3. 프롬프트 엔지니어링 (모드별 차등 적용)
+# ==========================================
+system_prompt = (
+    "당신은 OTGALNON의 최고 분석관입니다. 모든 답변에서 이모티콘을 금지하십시오. "
+    "사용자의 질문에 대해 제1원리 사고를 적용하여 답변하십시오."
+)
 
-# 세션 상태 초기화
+if gen_mode == "Script Generator":
+    system_prompt += (
+        "\n\n[SCRIPT MODE ACTIVE]\n"
+        "1. 코드는 실행 가능하고(Production-ready) 최적화되어야 합니다.\n"
+        "2. 모든 코드에는 한글 주석을 상세히 작성하십시오.\n"
+        "3. 사용자가 요청한 언어(Python, JS 등)의 최신 문법을 사용하십시오.\n"
+        "4. 코드 블록 앞뒤에 구현 로직에 대한 간략한 설명을 포함하십시오."
+    )
+
+# ==========================================
+# 4. 메인 채팅 인터페이스
+# ==========================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 대화 기록 렌더링
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ==========================================
-# 3. 명령 입력 및 추론 로직
-# ==========================================
-if prompt := st.chat_input("Enter command..."):
-    # 사용자 입력 표시 및 저장
+if prompt := st.chat_input("명령을 입력하십시오..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 비서 응답 생성
     with st.chat_message("assistant"):
-        if engine:
-            with st.spinner("ANALYZING..."):
-                try:
-                    # 무제한 쿼터 엔진 가동
-                    response = engine.generate_content(prompt)
-                    answer = response.text
-                    
-                    st.markdown(answer)
-                    st.session_state.messages.append({"role": "assistant", "content": answer})
-                except Exception as e:
-                    st.error(f"ENGINE ERROR: {str(e)}")
-        else:
-            st.warning("엔진 연결을 확인하십시오. API 키 설정 혹은 모델 접근 권한 문제일 수 있습니다.")
+        try:
+            model = genai.GenerativeModel(
+                model_name=active_model_id,
+                system_instruction=system_prompt
+            )
+            
+            with st.spinner("GENERATING SCRIPT..."):
+                response = model.generate_content(prompt)
+                answer = response.text
+                
+                # 마크다운 렌더링
+                st.markdown(answer)
+                # 스크립트 모드일 때 코드를 더 편하게 복사할 수 있도록 강조
+                if "```" in answer:
+                    st.info("스크립트가 생성되었습니다. 아래 코드 블록을 복사하십시오.")
+                
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+        except Exception as e:
+            st.error(f"RUNTIME ERROR: {str(e)}")

@@ -6,28 +6,38 @@ import google.generativeai as genai
 # ==========================================
 st.set_page_config(page_title="OTGALNON", page_icon="logo.png", layout="wide")
 
-# UI/UX 최적화 커스텀 CSS (아바타 숨김 및 여백 제거 완벽 적용)
+# UI/UX 최적화 커스텀 CSS (아바타 강제 숨김 및 여백 완벽 제거)
 st.markdown("""
     <style>
-    /* 1. 기본 아바타(로봇, 사람 아이콘) 완전히 숨기기 */
-    div[data-testid="stChatMessageAvatar"] {
+    /* 1. 아바타 관련 모든 요소를 추적하여 강제로 숨기고 영역을 0으로 만듦 */
+    [data-testid="stChatMessageAvatar"],
+    .stChatMessageAvatar,
+    div[data-testid="chatAvatarIcon-user"],
+    div[data-testid="chatAvatarIcon-assistant"] {
         display: none !important;
+        width: 0px !important;
+        height: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
     }
     
-    /* 2. 대화창 메시지 패딩 및 아이콘 빈자리(여백) 제거 */
-    div[data-testid="stChatMessage"] {
+    /* 2. 대화창 메시지 패딩 및 아이콘 빈자리(여백) 완전 제거 */
+    [data-testid="stChatMessage"] {
         padding: 1rem 0 !important;
         gap: 0rem !important;
+    }
+    
+    /* 3. 텍스트가 시작되는 콘텐츠 영역을 왼쪽 끝으로 밀착 */
+    [data-testid="stChatMessageContent"] {
+        margin-left: 0px !important;
         padding-left: 0.5rem !important;
     }
     
-    /* 3. 사이드바 이미지 중앙 정렬 */
+    /* 4. 사이드바 이미지 중앙 정렬 및 코드 블록 색상 */
     [data-testid="stSidebar"] img {
         margin-bottom: 2rem;
         border-radius: 8px;
     }
-    
-    /* 4. 코드 블록 포인트 컬러 (보라색) */
     code {
         color: #b39ddb !important;
     }

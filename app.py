@@ -2,48 +2,32 @@ import streamlit as st
 import google.generativeai as genai
 
 # ==========================================
-# 1. 페이지 테마 및 파비콘 설정
+# 1. 페이지 및 테마 설정
 # ==========================================
-# 파비콘을 logo.png로 교체하고 레이아웃을 와이드로 설정
 st.set_page_config(page_title="OTGALNON", page_icon="logo.png", layout="wide")
 
-# 아바타 아이콘 제거 및 여백 최적화 CSS
+# UI/UX 최적화 커스텀 CSS (아바타 숨김 및 여백 제거 완벽 적용)
 st.markdown("""
     <style>
-    /* 1. 사람 및 로봇 아바타 영역 완전히 숨기기 */
+    /* 1. 기본 아바타(로봇, 사람 아이콘) 완전히 숨기기 */
     div[data-testid="stChatMessageAvatar"] {
         display: none !important;
     }
     
-    /* 2. 아이콘이 사라진 빈 공간(여백) 제거 및 텍스트 왼쪽 정렬 */
+    /* 2. 대화창 메시지 패딩 및 아이콘 빈자리(여백) 제거 */
     div[data-testid="stChatMessage"] {
+        padding: 1rem 0 !important;
         gap: 0rem !important;
         padding-left: 0.5rem !important;
     }
-    </style>
-    """, unsafe_allow_html=True)
-
-# 모던 챗봇 스타일을 위한 커스텀 CSS 주입
-st.markdown("""
-    <style>
-    /* 1. 기본 아바타(로봇, 사람 아이콘) 숨기기 */
-    div[data-testid="stChatMessageAvatar"] {
-        display: none !important;
-    }
     
-    /* 2. 대화창 메시지 패딩 조절 (아바타가 없어진 공간 최적화) */
-    div[data-testid="stChatMessage"] {
-        padding: 1rem 0;
-        gap: 1rem;
-    }
-    
-    /* 3. 사이드바 이미지 중앙 정렬 및 여백 최적화 */
+    /* 3. 사이드바 이미지 중앙 정렬 */
     [data-testid="stSidebar"] img {
         margin-bottom: 2rem;
         border-radius: 8px;
     }
     
-    /* 4. 코드 블록 및 UI 요소에 보라색 포인트 적용 */
+    /* 4. 코드 블록 포인트 컬러 (보라색) */
     code {
         color: #b39ddb !important;
     }
@@ -51,7 +35,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 시스템 엔진 초기화
+# 2. 시스템 엔진 초기화 (무제한 쿼터 자동 탐지)
 # ==========================================
 def initialize_otgalnon():
     api_key = st.secrets.get("GEMINI_API_KEY")
@@ -61,6 +45,7 @@ def initialize_otgalnon():
     genai.configure(api_key=api_key)
     try:
         model_list = [m.name for m in genai.list_models()]
+        # 시스템 내부 식별자를 자동으로 찾아 연결
         target = next((m for m in model_list if "gemini-3-flash" in m), "models/gemini-1.5-flash")
         
         model = genai.GenerativeModel(
@@ -78,14 +63,14 @@ def initialize_otgalnon():
 engine, active_id = initialize_otgalnon()
 
 # ==========================================
-# 3. 사이드바 UI (미니멀리즘 적용)
+# 3. 사이드바 컨트롤 패널
 # ==========================================
 with st.sidebar:
-    # 버전 텍스트 삭제 및 logo.png 배치
     try:
         st.image("logo.png", use_column_width=True)
     except:
-        st.markdown("<h2 style='color: #6d5dfc; text-align: center;'>OTGALNON</h2>", unsafe_allow_html=True)
+        # 로고 파일이 없을 경우 텍스트로 대체
+        st.markdown("<h2 style='color: #6d5dfc; text-align: center; margin-bottom: 2rem;'>OTGALNON</h2>", unsafe_allow_html=True)
     
     st.markdown("### SYSTEM STATUS")
     if engine:
@@ -99,27 +84,26 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 4. 메인 챗봇 인터페이스
+# 4. 메인 챗봇 인터페이스 (텍스트 중심)
 # ==========================================
-# 상단 타이틀 숨김 처리 (챗봇 본연의 기능에 집중)
-# 세션 상태 초기화
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 대화 기록 렌더링
+# 대화 기록 렌더링 (아바타 없이 깔끔하게 출력됨)
 for msg in st.session_state.messages:
-    # CSS로 인해 아바타는 보이지 않고 텍스트만 깔끔하게 출력됨
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 # ==========================================
-# 5. 명령 입력 및 추론
+# 5. 명령 입력 및 추론 로직
 # ==========================================
-if prompt := st.chat_input("메시지를 입력하십시오..."):
+if prompt := st.chat_input("명령을 입력하십시오..."):
+    # 사용자 메시지
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # 분석관 응답
     with st.chat_message("assistant"):
         if engine:
             with st.spinner("분석 중..."):

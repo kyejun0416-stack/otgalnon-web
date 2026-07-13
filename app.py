@@ -63,7 +63,6 @@ def parse_text_to_ppt(ai_text):
         """슬라이드를 추가하는 내부 헬퍼 함수"""
         if bullets or title != "OTGALNON AI 분석 결과":
             s = prs.slides.add_slide(slide_layout_content)
-            # 샵(#) 기호 등 마크다운 문법 제거 후 제목 설정
             s.shapes.title.text = title.replace('#', '').replace('*', '').strip()
             tf = s.placeholders[1].text_frame
             if bullets:
@@ -78,9 +77,7 @@ def parse_text_to_ppt(ai_text):
         
         # ### 나 ## 혹은 #으로 시작하면 새로운 슬라이드 제목으로 인식
         if line.startswith('#'):
-            # 기존에 모인 내용이 있다면 슬라이드로 먼저 발행
             add_slide_to_presentation(current_title, current_bullets)
-            # 새로운 슬라이드 준비
             current_title = line
             current_bullets = []
         # 글머리 기호 나 숫자 문장들을 본문 텍스트로 인식
@@ -89,14 +86,11 @@ def parse_text_to_ppt(ai_text):
             if clean_bullet:
                 current_bullets.append(clean_bullet)
         else:
-            # 일반 문장도 슬라이드 내용에 포함 (너무 길지 않게 처리)
             if len(current_bullets) < 5:  # 슬라이드 한 장당 최대 5줄 제한
                 current_bullets.append(line)
                 
-    # 마지막에 남아있는 슬라이드 발행
     add_slide_to_presentation(current_title, current_bullets)
 
-    # 메모리 버퍼에 PPT 파일 저장
     ppt_buffer = io.BytesIO()
     prs.save(ppt_buffer)
     ppt_buffer.seek(0)
@@ -152,7 +146,6 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 🚀 OTGALNON TOOLS")
     
-    # 세션에 어시스턴트의 마지막 답변이 있는지 확인
     last_assistant_response = None
     if "messages" in st.session_state:
         for msg in reversed(st.session_state.messages):
@@ -160,7 +153,6 @@ with st.sidebar:
                 last_assistant_response = msg["content"]
                 break
 
-    # 마지막 답변이 존재할 때만 PPT 변환 버튼 활성화
     if last_assistant_response:
         try:
             ppt_file = parse_text_to_ppt(last_assistant_response)
@@ -199,7 +191,7 @@ if prompt := st.chat_input("명령을 입력하십시오..."):
                     answer = response.text
                     st.markdown(answer)
                     st.session_state.messages.append({"role": "assistant", "content": answer})
-                    st.rarun() # 버튼 상태 갱신을 위한 새로고침
+                    st.rerun() # 코드 하단 오타 수정 완료 (rarun -> rerun)
                 except Exception as e:
                     st.error(f"시스템 오류: {str(e)}")
         else:

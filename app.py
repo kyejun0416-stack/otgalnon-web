@@ -10,7 +10,7 @@ st.set_page_config(page_title="OTGALNON", page_icon="logo.png", layout="wide")
 
 st.markdown("""
     <style>
-    /* 아바타 숨김 및 여백 최적화 (이전 완벽 버전 유지) */
+    /* 아바타 숨김 및 여백 최적화 */
     [data-testid="stChatMessageAvatar"],
     .stChatMessageAvatar,
     div[data-testid="chatAvatarIcon-user"],
@@ -40,35 +40,63 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. PPT 자동 생성 로직 (OTGALNON 확장 기능)
+# 2. AI 답변 기반 동적 PPT 생성 로직
 # ==========================================
-def generate_ppt_buffer():
-    """PPT를 생성하고 메모리 버퍼에 저장하여 바로 다운로드할 수 있게 함"""
+def parse_text_to_ppt(ai_text):
+    """오트가논이 답변한 마크다운 텍스트를 분석하여 PPT 슬라이드로 자동 변환"""
     prs = Presentation()
+    lines = ai_text.split('\n')
     
-    # [슬라이드 1: 제목]
-    slide0 = prs.slides.add_slide(prs.slide_layouts[0])
-    slide0.shapes.title.text = "생성형 AI를 활용한 커스텀 챗봇 'OTGALNON' 개발"
-    slide0.placeholders[1].text = "API 연동 및 UI/UX 최적화 탐구\n\n2학년 O반 O번 OOO"
+    current_title = "OTGALNON AI 분석 결과"
+    current_bullets = []
+    
+    # 제목 레이아웃으로 첫 장 생성 (표지)
+    slide_layout_title = prs.slide_layouts[0]
+    slide = prs.slides.add_slide(slide_layout_title)
+    slide.shapes.title.text = "OTGALNON 실시간 발표자료"
+    slide.placeholders[1].text = "AI가 실시간으로 추출한 데이터 기반 보고서"
 
-    # [슬라이드 2: 목차]
-    slide1 = prs.slides.add_slide(prs.slide_layouts[1])
-    slide1.shapes.title.text = "목차"
-    tf1 = slide1.placeholders[1].text_frame
-    tf1.text = "1. 탐구 동기 및 시스템 구조"
-    tf1.add_paragraph().text = "2. 핵심 과제 1: 오류 디버깅 (404 Not Found 해결)"
-    tf1.add_paragraph().text = "3. 핵심 과제 2: UI/UX 디자인 최적화 (CSS 주입)"
-    tf1.add_paragraph().text = "4. 결론 및 느낀 점"
+    # 본문 슬라이드 레이아웃 (제목 + 내용)
+    slide_layout_content = prs.slide_layouts[1]
 
-    # [슬라이드 3: 핵심 내용 요약]
-    slide2 = prs.slides.add_slide(prs.slide_layouts[1])
-    slide2.shapes.title.text = "프로젝트 핵심 요약"
-    tf2 = slide2.placeholders[1].text_frame
-    tf2.text = "동적 모델 탐색(genai.list_models)을 통한 시스템 안정성 확보"
-    tf2.add_paragraph().text = "HTML DOM 분석 및 CSS 주입으로 모던 챗봇 인터페이스 구축"
-    tf2.add_paragraph().text = "python-pptx 라이브러리 연동으로 자기 생성형(Self-generating) 프로젝트 완성"
+    def add_slide_to_presentation(title, bullets):
+        """슬라이드를 추가하는 내부 헬퍼 함수"""
+        if bullets or title != "OTGALNON AI 분석 결과":
+            s = prs.slides.add_slide(slide_layout_content)
+            # 샵(#) 기호 등 마크다운 문법 제거 후 제목 설정
+            s.shapes.title.text = title.replace('#', '').replace('*', '').strip()
+            tf = s.placeholders[1].text_frame
+            if bullets:
+                tf.text = bullets[0]
+                for bullet in bullets[1:]:
+                    tf.add_paragraph().text = bullet
 
-    # 메모리에 저장 (서버에 쓰레기 파일이 남지 않도록 최적화)
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # ### 나 ## 혹은 #으로 시작하면 새로운 슬라이드 제목으로 인식
+        if line.startswith('#'):
+            # 기존에 모인 내용이 있다면 슬라이드로 먼저 발행
+            add_slide_to_presentation(current_title, current_bullets)
+            # 새로운 슬라이드 준비
+            current_title = line
+            current_bullets = []
+        # 글머리 기호 나 숫자 문장들을 본문 텍스트로 인식
+        elif line.startswith(('*', '-', '•')) or (line[0].isdigit() if len(line) > 0 else False):
+            clean_bullet = line.lstrip('*-•0123456789. ')
+            if clean_bullet:
+                current_bullets.append(clean_bullet)
+        else:
+            # 일반 문장도 슬라이드 내용에 포함 (너무 길지 않게 처리)
+            if len(current_bullets) < 5:  # 슬라이드 한 장당 최대 5줄 제한
+                current_bullets.append(line)
+                
+    # 마지막에 남아있는 슬라이드 발행
+    add_slide_to_presentation(current_title, current_bullets)
+
+    # 메모리 버퍼에 PPT 파일 저장
     ppt_buffer = io.BytesIO()
     prs.save(ppt_buffer)
     ppt_buffer.seek(0)
@@ -92,7 +120,8 @@ def initialize_otgalnon():
             system_instruction=(
                 "당신은 OTGALNON의 최고 분석관입니다. "
                 "이모티콘 사용을 엄격히 금지하며, 제1원리 추론에 기반해 논리적으로 답변하십시오. "
-                "코딩 스크립트 작성 시에는 주석과 함께 최적화된 코드를 제공하십시오."
+                "사용자가 발표 자료나 PPT 형태의 출력을 요구하면, 각 슬라이드의 제목은 '###' 또는 '##'으로 구분하고, "
+                "내용은 글머리 기호(* 또는 -)를 사용하여 요약식으로 가독성 있게 작성하십시오."
             )
         )
         return model, target
@@ -123,18 +152,29 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 🚀 OTGALNON TOOLS")
     
-    # PPT 생성 버튼 및 다운로드 로직
-    if st.button("📊 발표용 PPT 자동 생성", use_container_width=True):
-        with st.spinner("OTGALNON이 PPT를 작성 중입니다..."):
-            ppt_file = generate_ppt_buffer()
-            st.success("PPT 생성 완료!")
+    # 세션에 어시스턴트의 마지막 답변이 있는지 확인
+    last_assistant_response = None
+    if "messages" in st.session_state:
+        for msg in reversed(st.session_state.messages):
+            if msg["role"] == "assistant":
+                last_assistant_response = msg["content"]
+                break
+
+    # 마지막 답변이 존재할 때만 PPT 변환 버튼 활성화
+    if last_assistant_response:
+        try:
+            ppt_file = parse_text_to_ppt(last_assistant_response)
             st.download_button(
-                label="📥 PPT 파일 다운로드",
+                label="📥 마지막 답변 PPT로 다운로드",
                 data=ppt_file,
-                file_name="OTGALNON_발표자료.pptx",
+                file_name="OTGALNON_AI_발표자료.pptx",
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 use_container_width=True
             )
+        except Exception as e:
+            st.caption(f"PPT 파일 변환 대기 중...")
+    else:
+        st.info("오트가논에게 명령을 내려서 답변을 받아보세요. 그 답변으로 PPT를 만들어 드립니다.")
 
 # ==========================================
 # 5. 메인 챗봇 인터페이스
@@ -159,6 +199,7 @@ if prompt := st.chat_input("명령을 입력하십시오..."):
                     answer = response.text
                     st.markdown(answer)
                     st.session_state.messages.append({"role": "assistant", "content": answer})
+                    st.rarun() # 버튼 상태 갱신을 위한 새로고침
                 except Exception as e:
                     st.error(f"시스템 오류: {str(e)}")
         else:

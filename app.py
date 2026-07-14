@@ -2,6 +2,8 @@ import streamlit as st
 import google.generativeai as genai
 from pptx import Presentation
 import io
+import json
+import os
 
 # ==========================================
 # 1. 페이지 및 테마 설정
@@ -40,27 +42,43 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. AI 답변 기반 동적 PPT 생성 로직
+# 2. 대화 기록 자동 저장 및 복구 로직 (File I/O)
+# ==========================================
+HISTORY_FILE = "chat_history.json"
+
+def load_history():
+    """파일에서 대화 기록을 불러옵니다."""
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_history(messages):
+    """대화 기록을 파일에 즉시 저장합니다."""
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(messages, f, ensure_ascii=False, indent=4)
+
+# ==========================================
+# 3. AI 답변 기반 동적 PPT 생성 로직
 # ==========================================
 def parse_text_to_ppt(ai_text):
-    """오트가논이 답변한 마크다운 텍스트를 분석하여 PPT 슬라이드로 자동 변환"""
     prs = Presentation()
     lines = ai_text.split('\n')
     
     current_title = "OTGALNON AI 분석 결과"
     current_bullets = []
     
-    # 제목 레이아웃으로 첫 장 생성 (표지)
     slide_layout_title = prs.slide_layouts[0]
     slide = prs.slides.add_slide(slide_layout_title)
     slide.shapes.title.text = "OTGALNON 실시간 발표자료"
     slide.placeholders[1].text = "AI가 실시간으로 추출한 데이터 기반 보고서"
 
-    # 본문 슬라이드 레이아웃 (제목 + 내용)
     slide_layout_content = prs.slide_layouts[1]
 
     def add_slide_to_presentation(title, bullets):
-        """슬라이드를 추가하는 내부 헬퍼 함수"""
         if bullets or title != "OTGALNON AI 분석 결과":
             s = prs.slides.add_slide(slide_layout_content)
             s.shapes.title.text = title.replace('#', '').replace('*', '').strip()
@@ -75,18 +93,16 @@ def parse_text_to_ppt(ai_text):
         if not line:
             continue
         
-        # ### 나 ## 혹은 #으로 시작하면 새로운 슬라이드 제목으로 인식
         if line.startswith('#'):
             add_slide_to_presentation(current_title, current_bullets)
             current_title = line
             current_bullets = []
-        # 글머리 기호 나 숫자 문장들을 본문 텍스트로 인식
         elif line.startswith(('*', '-', '•')) or (line[0].isdigit() if len(line) > 0 else False):
             clean_bullet = line.lstrip('*-•0123456789. ')
             if clean_bullet:
                 current_bullets.append(clean_bullet)
         else:
-            if len(current_bullets) < 5:  # 슬라이드 한 장당 최대 5줄 제한
+            if len(current_bullets) < 5:
                 current_bullets.append(line)
                 
     add_slide_to_presentation(current_title, current_bullets)
@@ -97,7 +113,7 @@ def parse_text_to_ppt(ai_text):
     return ppt_buffer
 
 # ==========================================
-# 3. 시스템 엔진 초기화
+# 4. 시스템 엔진 초기화
 # ==========================================
 def initialize_otgalnon():
     api_key = st.secrets.get("GEMINI_API_KEY")
@@ -125,7 +141,7 @@ def initialize_otgalnon():
 engine, active_id = initialize_otgalnon()
 
 # ==========================================
-# 4. 사이드바 컨트롤 패널
+# 5. 사이드바 컨트롤 패널
 # ==========================================
 with st.sidebar:
     try:
@@ -139,8 +155,11 @@ with st.sidebar:
     else:
         st.error("OFFLINE")
     
+    # [수정됨] 워크스페이스 리셋 시 파일도 함께 삭제하여 완벽하게 비움
     if st.button("RESET WORKSPACE", use_container_width=True):
         st.session_state.messages = []
+        if os.path.exists(HISTORY_FILE):
+            os.remove(HISTORY_FILE)
         st.rerun()
 
     st.markdown("---")
@@ -169,17 +188,21 @@ with st.sidebar:
         st.info("오트가논에게 명령을 내려서 답변을 받아보세요. 그 답변으로 PPT를 만들어 드립니다.")
 
 # ==========================================
-# 5. 메인 챗봇 인터페이스
+# 6. 메인 챗봇 인터페이스
 # ==========================================
+# [수정됨] 시작할 때 파일에 저장된 기록이 있으면 불러옴
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = load_history()
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 if prompt := st.chat_input("명령을 입력하십시오..."):
+    # 사용자 메시지 저장
     st.session_state.messages.append({"role": "user", "content": prompt})
+    save_history(st.session_state.messages)
+    
     with st.chat_message("user"):
         st.markdown(prompt)
 
@@ -190,8 +213,12 @@ if prompt := st.chat_input("명령을 입력하십시오..."):
                     response = engine.generate_content(prompt)
                     answer = response.text
                     st.markdown(answer)
+                    
+                    # 어시스턴트(AI) 메시지 저장
                     st.session_state.messages.append({"role": "assistant", "content": answer})
-                    st.rerun() # 코드 하단 오타 수정 완료 (rarun -> rerun)
+                    save_history(st.session_state.messages)
+                    
+                    st.rerun() # 버튼 상태 갱신
                 except Exception as e:
                     st.error(f"시스템 오류: {str(e)}")
         else:
